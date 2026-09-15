@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Plus, Pencil, Trash2, Upload, Download } from 'lucide-react';
 import { useToast } from '../../components/ui/use-toast';
 import { showAlert } from '../../utils/sweetAlert';
+import * as XLSX from 'xlsx';
 
 export default function Students() {
     const queryClient = useQueryClient();
@@ -132,40 +133,47 @@ export default function Students() {
         const reader = new FileReader();
         reader.onload = async (event) => {
             try {
-                const text = event.target?.result as string;
-                const lines = text.split('\n').filter(line => line.trim());
+                const data = new Uint8Array(event.target?.result as ArrayBuffer);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const rows = XLSX.utils.sheet_to_json(worksheet) as any[];
 
-                if (lines.length < 2) {
+                if (!rows || rows.length === 0) {
                     toast({
                         variant: "destructive",
                         title: "File Kosong",
-                        description: "File CSV tidak memiliki data.",
+                        description: "File Excel tidak memiliki data.",
                     });
                     return;
                 }
 
-                // Parse CSV
+                // Parse Excel rows
                 const students: Partial<Student>[] = [];
-                for (let i = 1; i < lines.length; i++) {
-                    const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                for (const row of rows) {
+                    const nama = row['Nama'] || row['nama'];
+                    const nis = row['NIS'] || row['nis'];
+                    const halaqahName = row['Halaqah'] || row['halaqah'];
+                    const namaOrangTua = row['Nama Orang Tua'] || row['nama orang tua'] || row['Nama OrangTua'];
+                    const shift = row['Shift'] || row['shift'];
 
-                    if (values.length >= 2 && values[0]) {
-                        const halaqahName = values[2];
+                    if (nama) {
                         let halaqahId = null;
 
                         if (halaqahName && halaqahList) {
                             const halaqah = halaqahList.find(h =>
-                                h.nama.toLowerCase() === halaqahName.toLowerCase()
+                                h.nama.toLowerCase() === String(halaqahName).toLowerCase()
                             );
                             halaqahId = halaqah?.id || null;
                         }
 
                         students.push({
-                            nama: values[0],
-                            nis: values[1] || undefined,
+                            nama: String(nama),
+                            nis: nis ? String(nis) : undefined,
                             halaqah_id: halaqahId || undefined,
-                            nama_orang_tua: values[3] || undefined,
-                            shift: (values[4] === 'Siang' ? 'Siang' : 'Sore') as 'Siang' | 'Sore',
+                            nama_orang_tua: namaOrangTua ? String(namaOrangTua) : undefined,
+                            shift: (String(shift).toLowerCase() === 'siang' ? 'Siang' : 'Sore') as 'Siang' | 'Sore',
                             is_active: true,
                         });
                     }
@@ -175,7 +183,7 @@ export default function Students() {
                     toast({
                         variant: "destructive",
                         title: "Tidak Ada Data Valid",
-                        description: "Tidak ada data santri yang valid di file CSV.",
+                        description: "Tidak ada data santri yang valid di file Excel.",
                     });
                     return;
                 }
@@ -187,22 +195,33 @@ export default function Students() {
                     title: "Error Parsing File",
                     description: error.message,
                 });
+            } finally {
+                if (e.target) e.target.value = '';
             }
         };
-        reader.readAsText(file);
+        reader.readAsArrayBuffer(file);
     };
 
     const downloadTemplate = () => {
-        const csv = `Nama,NIS,Halaqah,Nama Orang Tua,Shift
-Ahmad Fauzi,2024001,Al-Fatihah,Bapak Ahmad,Sore
-Fatimah Zahra,2024002,Al-Baqarah,Ibu Fatimah,Siang`;
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'template_import_santri.csv';
-        a.click();
-        URL.revokeObjectURL(url);
+        const worksheet = XLSX.utils.json_to_sheet([
+            {
+                Nama: 'Ahmad Fauzi',
+                NIS: '2024001',
+                Halaqah: 'Al-Fatihah',
+                'Nama Orang Tua': 'Bapak Ahmad',
+                Shift: 'Sore'
+            },
+            {
+                Nama: 'Fatimah Zahra',
+                NIS: '2024002',
+                Halaqah: 'Al-Baqarah',
+                'Nama Orang Tua': 'Ibu Fatimah',
+                Shift: 'Siang'
+            }
+        ]);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Template Santri");
+        XLSX.writeFile(workbook, "template_import_santri.xlsx");
     };
 
     return (
@@ -291,9 +310,9 @@ Fatimah Zahra,2024002,Al-Baqarah,Ibu Fatimah,Siang`;
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <h3 className="font-semibold text-blue-900 mb-2">Format File CSV:</h3>
+                            <h3 className="font-semibold text-blue-900 mb-2">Format File Excel (.xlsx):</h3>
                             <p className="text-sm text-blue-800 mb-3">
-                                File harus berformat CSV dengan kolom: <strong>Nama, NIS, Halaqah, Nama Orang Tua, Shift</strong>
+                                File harus berformat Excel dengan kolom: <strong>Nama, NIS, Halaqah, Nama Orang Tua, Shift</strong>
                             </p>
                             <Button size="sm" variant="outline" onClick={downloadTemplate}>
                                 <Download className="mr-2 h-4 w-4" /> Download Template
@@ -301,10 +320,10 @@ Fatimah Zahra,2024002,Al-Baqarah,Ibu Fatimah,Siang`;
                         </div>
 
                         <div className="space-y-2">
-                            <Label>Upload File CSV</Label>
+                            <Label>Upload File Excel</Label>
                             <Input
                                 type="file"
-                                accept=".csv"
+                                accept=".xlsx, .xls"
                                 onChange={handleFileUpload}
                                 disabled={importMutation.isPending}
                             />
