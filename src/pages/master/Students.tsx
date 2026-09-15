@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { Student, Halaqah } from '../../types';
@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Plus, Pencil, Trash2, Upload, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, Upload, Download, Search, Trash } from 'lucide-react';
 import { useToast } from '../../components/ui/use-toast';
 import { showAlert } from '../../utils/sweetAlert';
 import * as XLSX from 'xlsx';
@@ -18,6 +18,17 @@ export default function Students() {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
     const [formData, setFormData] = useState<Partial<Student>>({});
+
+    // Pagination & Table states
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(8);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [filters, setFilters] = useState({
+        nama: '',
+        nis: '',
+        halaqah: '',
+        shift: ''
+    });
 
     const { data: students, isLoading } = useQuery({
         queryKey: ['students'],
@@ -51,17 +62,27 @@ export default function Students() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['students'] });
+            setSelectedIds(prev => prev.filter(selectedId => selectedId !== isEditing?.id));
+        },
+    });
+
+    const bulkDeleteMutation = useMutation({
+        mutationFn: async (ids: string[]) => {
+            const { error } = await supabase.from('students').delete().in('id', ids);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['students'] });
+            setSelectedIds([]);
+            toast({ title: 'Berhasil', description: 'Data santri terpilih berhasil dihapus.' });
         },
     });
 
     const saveMutation = useMutation({
         mutationFn: async (data: Partial<Student>) => {
-            // Ensure halaqah_id is set correctly (or null if empty)
             const payload = {
                 ...data,
                 halaqah_id: data.halaqah_id || null,
-                // Clear legacy field if using new system, or keep it synced if needed. 
-                // For now we just update halaqah_id.
             };
 
             if (isEditing?.id) {
@@ -83,10 +104,9 @@ export default function Students() {
         },
     });
 
-    // Bulk import mutation
     const importMutation = useMutation({
-        mutationFn: async (students: Partial<Student>[]) => {
-            const { error } = await supabase.from('students').insert(students);
+        mutationFn: async (studentsToImport: Partial<Student>[]) => {
+            const { error } = await supabase.from('students').insert(studentsToImport);
             if (error) throw error;
         },
         onSuccess: (_, variables) => {
@@ -110,7 +130,7 @@ export default function Students() {
         setIsEditing(student);
         setFormData({
             ...student,
-            halaqah_id: student.halaqah_id || '' // Ensure controlled input
+            halaqah_id: student.halaqah_id || ''
         });
         setIsFormOpen(true);
     };
@@ -118,6 +138,26 @@ export default function Students() {
     const handleDelete = async (id: string) => {
         if (await showAlert.confirm('Yakin ingin menghapus santri ini?')) {
             deleteMutation.mutate(id);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.length === 0) return;
+        if (await showAlert.confirm(`Yakin ingin menghapus ${selectedIds.length} santri terpilih?`)) {
+            bulkDeleteMutation.mutate(selectedIds);
+        }
+    };
+
+    const handleDeleteAll = async () => {
+        if (await showAlert.confirm('PERINGATAN: Yakin ingin menghapus SEMUA data santri? Tindakan ini tidak bisa dibatalkan.')) {
+            const { error } = await supabase.from('students').delete().in('id', students?.map(s => s.id) || []);
+            if (!error) {
+                queryClient.invalidateQueries({ queryKey: ['students'] });
+                setSelectedIds([]);
+                toast({ title: 'Berhasil', description: 'Semua data santri berhasil dihapus.' });
+            } else {
+                toast({ variant: 'destructive', title: 'Gagal', description: error.message });
+            }
         }
     };
 
@@ -149,8 +189,7 @@ export default function Students() {
                     return;
                 }
 
-                // Parse Excel rows
-                const students: Partial<Student>[] = [];
+                const studentsToImport: Partial<Student>[] = [];
                 for (const row of rows) {
                     const nama = row['Nama'] || row['nama'];
                     const nis = row['NIS'] || row['nis'];
@@ -168,7 +207,7 @@ export default function Students() {
                             halaqahId = halaqah?.id || null;
                         }
 
-                        students.push({
+                        studentsToImport.push({
                             nama: String(nama),
                             nis: nis ? String(nis) : undefined,
                             halaqah_id: halaqahId || undefined,
@@ -179,7 +218,7 @@ export default function Students() {
                     }
                 }
 
-                if (students.length === 0) {
+                if (studentsToImport.length === 0) {
                     toast({
                         variant: "destructive",
                         title: "Tidak Ada Data Valid",
@@ -188,7 +227,7 @@ export default function Students() {
                     return;
                 }
 
-                importMutation.mutate(students);
+                importMutation.mutate(studentsToImport);
             } catch (error: any) {
                 toast({
                     variant: "destructive",
@@ -224,11 +263,60 @@ export default function Students() {
         XLSX.writeFile(workbook, "template_import_santri.xlsx");
     };
 
+    // Filter Logic
+    const filteredStudents = useMemo(() => {
+        if (!students) return [];
+        return students.filter(s => {
+            const matchNama = s.nama.toLowerCase().includes(filters.nama.toLowerCase());
+            const matchNis = (s.nis || '').toLowerCase().includes(filters.nis.toLowerCase());
+            const halaqahName = s.halaqah_data?.nama || s.halaqah || '';
+            const matchHalaqah = halaqahName.toLowerCase().includes(filters.halaqah.toLowerCase());
+            const matchShift = (s.shift || '').toLowerCase().includes(filters.shift.toLowerCase());
+            return matchNama && matchNis && matchHalaqah && matchShift;
+        });
+    }, [students, filters]);
+
+    // Pagination Logic
+    const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(filteredStudents.length / itemsPerPage);
+    
+    // Ensure currentPage is valid after filtering
+    if (currentPage > totalPages && totalPages > 0) {
+        setCurrentPage(1);
+    }
+
+    const paginatedStudents = useMemo(() => {
+        if (itemsPerPage === 'all') return filteredStudents;
+        const start = (currentPage - 1) * itemsPerPage;
+        return filteredStudents.slice(start, start + itemsPerPage);
+    }, [filteredStudents, currentPage, itemsPerPage]);
+
+    const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked) {
+            // Select all on current page
+            const newIds = new Set([...selectedIds, ...paginatedStudents.map(s => s.id)]);
+            setSelectedIds(Array.from(newIds));
+        } else {
+            // Deselect all on current page
+            const pageIds = paginatedStudents.map(s => s.id);
+            setSelectedIds(selectedIds.filter(id => !pageIds.includes(id)));
+        }
+    };
+
+    const handleSelectRow = (e: React.ChangeEvent<HTMLInputElement>, id: string) => {
+        if (e.target.checked) {
+            setSelectedIds(prev => [...prev, id]);
+        } else {
+            setSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
+        }
+    };
+
+    const isAllPageSelected = paginatedStudents.length > 0 && paginatedStudents.every(s => selectedIds.includes(s.id));
+
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h1 className="text-2xl font-bold">Data Santri</h1>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     <Button variant="outline" onClick={() => setIsImportOpen(true)}>
                         <Upload className="mr-2 h-4 w-4" /> Import Massal
                     </Button>
@@ -303,7 +391,6 @@ export default function Students() {
                 </Card>
             )}
 
-            {/* Import Dialog */}
             {isImportOpen && (
                 <Card className="mb-6">
                     <CardHeader>
@@ -319,35 +406,12 @@ export default function Students() {
                                 <Download className="mr-2 h-4 w-4" /> Download Template
                             </Button>
                         </div>
-
                         <div className="space-y-2">
                             <Label>Upload File Excel</Label>
-                            <Input
-                                type="file"
-                                accept=".xlsx, .xls"
-                                onChange={handleFileUpload}
-                                disabled={importMutation.isPending}
-                            />
+                            <Input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} disabled={importMutation.isPending} />
                         </div>
-
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                            <p className="text-xs text-yellow-800">
-                                <strong>Catatan:</strong>
-                            </p>
-                            <ul className="text-xs text-yellow-700 list-disc list-inside mt-1 space-y-1">
-                                <li>Nama Halaqah harus sesuai dengan data yang sudah ada</li>
-                                <li>Shift: "Siang", "Sore", atau "Malam" (default: Sore)</li>
-                                <li>Jika Halaqah tidak ditemukan, santri akan ditambahkan tanpa Halaqah</li>
-                            </ul>
-                        </div>
-
                         <div className="flex justify-end gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setIsImportOpen(false)}
-                                disabled={importMutation.isPending}
-                            >
+                            <Button type="button" variant="outline" onClick={() => setIsImportOpen(false)} disabled={importMutation.isPending}>
                                 Batal
                             </Button>
                         </div>
@@ -355,49 +419,207 @@ export default function Students() {
                 </Card>
             )}
 
-            {isLoading ? (
-                <div>Loading...</div>
-            ) : (
-                <div className="bg-white rounded-md border">
+            {/* Table Area */}
+            <Card className="overflow-hidden border-border/40 shadow-sm">
+                <div className="p-4 bg-gray-50/50 border-b flex flex-wrap gap-4 items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        {selectedIds.length > 0 && (
+                            <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+                                <Trash className="mr-2 h-4 w-4" /> Hapus {selectedIds.length} Terpilih
+                            </Button>
+                        )}
+                        <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={handleDeleteAll}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Hapus Semua
+                        </Button>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Tampilkan:</span>
+                        <select 
+                            className="border rounded px-2 py-1 bg-white text-sm"
+                            value={itemsPerPage}
+                            onChange={(e) => {
+                                setItemsPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value));
+                                setCurrentPage(1);
+                            }}
+                        >
+                            <option value={8}>8</option>
+                            <option value={30}>30</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                            <option value="all">Semua</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-50 border-b">
+                        <thead className="bg-gray-50/80 border-b">
+                            {/* Column Titles */}
                             <tr>
-                                <th className="px-4 py-3 font-medium">Nama</th>
-                                <th className="px-4 py-3 font-medium">NIS</th>
-                                <th className="px-4 py-3 font-medium">Halaqah</th>
-                                <th className="px-4 py-3 font-medium">Shift</th>
-                                <th className="px-4 py-3 font-medium text-right">Aksi</th>
+                                <th className="px-4 py-3 w-10 text-center">
+                                    <input 
+                                        type="checkbox" 
+                                        className="rounded border-gray-300"
+                                        checked={isAllPageSelected}
+                                        onChange={handleSelectAll} 
+                                    />
+                                </th>
+                                <th className="px-4 py-3 font-semibold text-gray-700">Nama</th>
+                                <th className="px-4 py-3 font-semibold text-gray-700">NIS</th>
+                                <th className="px-4 py-3 font-semibold text-gray-700">Halaqah</th>
+                                <th className="px-4 py-3 font-semibold text-gray-700">Shift</th>
+                                <th className="px-4 py-3 font-semibold text-gray-700 text-right w-24">Aksi</th>
+                            </tr>
+                            {/* Column Filters */}
+                            <tr className="border-t bg-gray-50/30">
+                                <th className="px-4 py-2 border-r"></th>
+                                <th className="px-4 py-2 border-r">
+                                    <div className="relative">
+                                        <Search className="absolute left-2 top-2 h-3 w-3 text-gray-400" />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Filter..." 
+                                            className="w-full pl-7 pr-2 py-1 text-xs border rounded-md"
+                                            value={filters.nama}
+                                            onChange={(e) => setFilters(prev => ({ ...prev, nama: e.target.value }))}
+                                        />
+                                    </div>
+                                </th>
+                                <th className="px-4 py-2 border-r">
+                                    <div className="relative">
+                                        <Search className="absolute left-2 top-2 h-3 w-3 text-gray-400" />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Filter..." 
+                                            className="w-full pl-7 pr-2 py-1 text-xs border rounded-md"
+                                            value={filters.nis}
+                                            onChange={(e) => setFilters(prev => ({ ...prev, nis: e.target.value }))}
+                                        />
+                                    </div>
+                                </th>
+                                <th className="px-4 py-2 border-r">
+                                    <div className="relative">
+                                        <Search className="absolute left-2 top-2 h-3 w-3 text-gray-400" />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Filter..." 
+                                            className="w-full pl-7 pr-2 py-1 text-xs border rounded-md"
+                                            value={filters.halaqah}
+                                            onChange={(e) => setFilters(prev => ({ ...prev, halaqah: e.target.value }))}
+                                        />
+                                    </div>
+                                </th>
+                                <th className="px-4 py-2 border-r">
+                                    <div className="relative">
+                                        <Search className="absolute left-2 top-2 h-3 w-3 text-gray-400" />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Filter..." 
+                                            className="w-full pl-7 pr-2 py-1 text-xs border rounded-md"
+                                            value={filters.shift}
+                                            onChange={(e) => setFilters(prev => ({ ...prev, shift: e.target.value }))}
+                                        />
+                                    </div>
+                                </th>
+                                <th className="px-4 py-2"></th>
                             </tr>
                         </thead>
                         <tbody>
-                            {students?.map((student) => (
-                                <tr key={student.id} className="border-b last:border-0 hover:bg-gray-50">
-                                    <td className="px-4 py-3">{student.nama}</td>
-                                    <td className="px-4 py-3">{student.nis || '-'}</td>
-                                    <td className="px-4 py-3">
-                                        {student.halaqah_data?.nama || student.halaqah || <span className="text-gray-400 italic">Belum ditentukan</span>}
-                                    </td>
-                                    <td className="px-4 py-3">{student.shift || 'Sore'}</td>
-                                    <td className="px-4 py-3 text-right space-x-2">
-                                        <Button size="sm" variant="ghost" onClick={() => handleEdit(student)}>
-                                            <Pencil className="h-4 w-4" />
-                                        </Button>
-                                        <Button size="sm" variant="ghost" className="text-red-500" onClick={() => handleDelete(student.id)}>
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </td>
-                                </tr>
-                            ))}
-                            {students?.length === 0 && (
+                            {isLoading ? (
                                 <tr>
-                                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">Belum ada data santri</td>
+                                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">Memuat data...</td>
                                 </tr>
+                            ) : paginatedStudents.length === 0 ? (
+                                <tr>
+                                    <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
+                                        Tidak ada data yang sesuai.
+                                    </td>
+                                </tr>
+                            ) : (
+                                paginatedStudents.map((student) => (
+                                    <tr key={student.id} className="border-b last:border-0 hover:bg-gray-50/80 transition-colors">
+                                        <td className="px-4 py-3 text-center">
+                                            <input 
+                                                type="checkbox" 
+                                                className="rounded border-gray-300"
+                                                checked={selectedIds.includes(student.id)}
+                                                onChange={(e) => handleSelectRow(e, student.id)}
+                                            />
+                                        </td>
+                                        <td className="px-4 py-3 font-medium text-gray-900">{student.nama}</td>
+                                        <td className="px-4 py-3 text-gray-600">{student.nis || '-'}</td>
+                                        <td className="px-4 py-3">
+                                            {student.halaqah_data?.nama || student.halaqah ? (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                                                    {student.halaqah_data?.nama || student.halaqah}
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-400 italic text-xs">Belum ditentukan</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded-md">
+                                                {student.shift || 'Sore'}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <div className="flex justify-end items-center gap-1">
+                                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleEdit(student)}>
+                                                    <Pencil className="h-4 w-4" />
+                                                </Button>
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(student.id)}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
                             )}
                         </tbody>
                     </table>
                 </div>
-            )}
+                
+                {/* Pagination Controls */}
+                {!isLoading && itemsPerPage !== 'all' && totalPages > 1 && (
+                    <div className="p-4 border-t bg-gray-50/50 flex items-center justify-between">
+                        <div className="text-xs text-muted-foreground">
+                            Menampilkan {((currentPage - 1) * (itemsPerPage as number)) + 1} - {Math.min(currentPage * (itemsPerPage as number), filteredStudents.length)} dari {filteredStudents.length} santri
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
+                            >
+                                Prev
+                            </Button>
+                            
+                            <div className="flex items-center gap-1 mx-2">
+                                {Array.from({ length: totalPages }).map((_, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => setCurrentPage(i + 1)}
+                                        className={`w-8 h-8 rounded-md text-sm ${currentPage === i + 1 ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                                    >
+                                        {i + 1}
+                                    </button>
+                                ))}
+                            </div>
+                            
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                disabled={currentPage === totalPages}
+                            >
+                                Next
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </Card>
         </div>
     );
 }
-
