@@ -8,6 +8,7 @@ import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Trash2, Plus, Edit, Check, X } from 'lucide-react';
 import { CloudinaryUpload } from '../../components/ui/CloudinaryUpload';
+import { showAlert } from '../../utils/sweetAlert';
 
 export default function Settings() {
     const queryClient = useQueryClient();
@@ -79,13 +80,13 @@ export default function Settings() {
             return;
         }
 
-        const score = parseInt(newMinScore);
-        if (score < 0 || score > 100) {
+        const minScore = parseInt(newMinScore);
+        if (minScore < 0 || minScore > 100) {
             showAlert.warning('Peringatan', 'Nilai minimum harus antara 0-100');
             return;
         }
 
-        if (gradeScale[newGrade.toUpperCase()]) {
+        if (gradeScale[newGrade.toUpperCase()] !== undefined) {
             showAlert.warning('Peringatan', 'Predikat sudah ada');
             return;
         }
