@@ -14,7 +14,7 @@ export interface Halaqah {
     guru_id?: string;
     is_active: boolean;
     tahsin_items?: string[];
-    shift?: 'Siang' | 'Sore'; // New field
+    shift?: 'Siang' | 'Sore' | 'Malam'; // New field
     guru?: User; // Joined data
 }
 
@@ -58,7 +58,7 @@ export interface Student {
     jenis_kelamin: 'L' | 'P';
     tanggal_lahir: string;
     nama_orang_tua: string;
-    shift?: 'Siang' | 'Sore';
+    shift?: 'Siang' | 'Sore' | 'Malam';
     is_active: boolean;
 }
 

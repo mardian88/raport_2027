@@ -159,11 +159,12 @@ export default function HalaqahManagement() {
                                 <select
                                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                     value={formData.shift}
-                                    onChange={(e) => setFormData({ ...formData, shift: e.target.value as 'Siang' | 'Sore' | '' })}
+                                    onChange={(e) => setFormData({ ...formData, shift: e.target.value as 'Siang' | 'Sore' | 'Malam' | '' })}
                                 >
                                     <option value="">-- Tidak ditentukan --</option>
                                     <option value="Siang">Siang</option>
                                     <option value="Sore">Sore</option>
+                                    <option value="Malam">Malam</option>
                                 </select>
                                 <p className="text-xs text-muted-foreground">
                                     Jika diisi, semua santri dalam halaqah ini akan mengikuti aturan shift ini (misal: Shift Siang tidak ada input Shalat Berjamaah).

@@ -173,7 +173,7 @@ export default function Students() {
                             nis: nis ? String(nis) : undefined,
                             halaqah_id: halaqahId || undefined,
                             nama_orang_tua: namaOrangTua ? String(namaOrangTua) : undefined,
-                            shift: (String(shift).toLowerCase() === 'siang' ? 'Siang' : 'Sore') as 'Siang' | 'Sore',
+                            shift: (String(shift).toLowerCase() === 'siang' ? 'Siang' : String(shift).toLowerCase() === 'malam' ? 'Malam' : 'Sore') as 'Siang' | 'Sore' | 'Malam',
                             is_active: true,
                         });
                     }
@@ -286,10 +286,11 @@ export default function Students() {
                                     <select
                                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                         value={formData.shift || 'Sore'}
-                                        onChange={(e) => setFormData({ ...formData, shift: e.target.value as 'Siang' | 'Sore' })}
+                                        onChange={(e) => setFormData({ ...formData, shift: e.target.value as 'Siang' | 'Sore' | 'Malam' })}
                                     >
                                         <option value="Siang">Siang</option>
                                         <option value="Sore">Sore</option>
+                                        <option value="Malam">Malam</option>
                                     </select>
                                 </div>
                             </div>
@@ -335,7 +336,7 @@ export default function Students() {
                             </p>
                             <ul className="text-xs text-yellow-700 list-disc list-inside mt-1 space-y-1">
                                 <li>Nama Halaqah harus sesuai dengan data yang sudah ada</li>
-                                <li>Shift: "Siang" atau "Sore" (default: Sore)</li>
+                                <li>Shift: "Siang", "Sore", atau "Malam" (default: Sore)</li>
                                 <li>Jika Halaqah tidak ditemukan, santri akan ditambahkan tanpa Halaqah</li>
                             </ul>
                         </div>
