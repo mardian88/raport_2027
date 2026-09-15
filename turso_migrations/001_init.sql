@@ -100,6 +100,7 @@ CREATE INDEX idx_semesters_ay ON semesters(academic_year_id);
 CREATE TABLE halaqah (
   id TEXT PRIMARY KEY,
   nama TEXT NOT NULL,
+  guru_id TEXT,
   shift TEXT CHECK(shift IN ('Siang','Sore')) DEFAULT 'Sore',
   tahsin_items TEXT DEFAULT '[]',
   is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
