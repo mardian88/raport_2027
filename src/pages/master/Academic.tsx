@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { AcademicYear, Semester } from '../../types';
@@ -7,6 +7,7 @@ import { Input } from '../../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Plus, Check, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { showAlert } from '../../utils/sweetAlert';
 
 export default function Academic() {
     const queryClient = useQueryClient();
@@ -114,8 +115,8 @@ export default function Academic() {
                                         {year.tahun_ajaran}
                                         {year.is_active && <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">Aktif</span>}
                                     </CardTitle>
-                                    <Button variant="ghost" size="sm" className="text-red-500" onClick={() => {
-                                        if (confirm('Hapus tahun ajaran ini?')) deleteYearMutation.mutate(year.id);
+                                    <Button variant="ghost" size="sm" className="text-red-500" onClick={async () => {
+                                        if (await showAlert.confirm('Hapus tahun ajaran ini?')) deleteYearMutation.mutate(year.id);
                                     }}>
                                         <Trash2 className="h-4 w-4" />
                                     </Button>

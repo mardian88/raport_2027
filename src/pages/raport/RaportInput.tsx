@@ -5,6 +5,8 @@ import type { Student, SettingsLembaga, ReportCard, Semester, TeacherAssignment 
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Label } from '../../components/ui/label';
+import { EmptyState } from '../../components/raport/EmptyState';
+import { showAlert } from '../../utils/sweetAlert';
 import { ScoreInput } from '../../components/raport/ScoreInput';
 import { TahfidzInput } from '../../components/raport/TahfidzInput';
 import { calculateAverage, calculateFinalScore, calculateKognitifScore, formatScore, getPredikat } from '../../utils/grading';
@@ -598,10 +600,10 @@ export default function RaportInput() {
             });
             setInitialFormState(newState);
 
-            alert('Raport berhasil disimpan');
+            showAlert.success('Berhasil', 'Raport berhasil disimpan');
         },
         onError: (error: any) => {
-            alert('Gagal menyimpan raport: ' + error.message);
+            showAlert.error('Gagal', 'Gagal menyimpan raport: ' + error.message);
         }
     });
 
@@ -758,11 +760,11 @@ export default function RaportInput() {
                                                 const value = parseInt(input.value);
 
                                                 if (!value) {
-                                                    alert('Mohon isi nilai terlebih dahulu');
+                                                    showAlert.warning('Peringatan', 'Mohon isi nilai terlebih dahulu');
                                                     return;
                                                 }
                                                 if (value < 10 || value > 100) {
-                                                    alert('Nilai harus antara 10-100');
+                                                    showAlert.warning('Peringatan', 'Nilai harus antara 10-100');
                                                     return;
                                                 }
 
@@ -833,11 +835,11 @@ export default function RaportInput() {
                                                 const value = parseInt(input.value);
 
                                                 if (!value) {
-                                                    alert('Mohon isi nilai terlebih dahulu');
+                                                    showAlert.warning('Peringatan', 'Mohon isi nilai terlebih dahulu');
                                                     return;
                                                 }
                                                 if (value < 10 || value > 100) {
-                                                    alert('Nilai harus antara 10-100');
+                                                    showAlert.warning('Peringatan', 'Nilai harus antara 10-100');
                                                     return;
                                                 }
 
@@ -930,11 +932,11 @@ export default function RaportInput() {
                                                     const value = parseInt(input.value);
 
                                                     if (!value) {
-                                                        alert('Mohon isi nilai terlebih dahulu');
+                                                        showAlert.warning('Peringatan', 'Mohon isi nilai terlebih dahulu');
                                                         return;
                                                     }
                                                     if (value < 10 || value > 100) {
-                                                        alert('Nilai harus antara 10-100');
+                                                        showAlert.warning('Peringatan', 'Nilai harus antara 10-100');
                                                         return;
                                                     }
 

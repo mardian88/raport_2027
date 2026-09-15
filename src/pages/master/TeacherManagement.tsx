@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '../../components/ui/dialog';
 import { Pencil, Plus, Loader2 } from 'lucide-react';
 import { CloudinaryUpload } from '../../components/ui/CloudinaryUpload';
+import { showAlert } from '../../utils/sweetAlert';
 import type { User } from '../../types';
 
 export default function TeacherManagement() {
@@ -57,10 +58,10 @@ export default function TeacherManagement() {
             queryClient.invalidateQueries({ queryKey: ['teachers_list'] });
             setIsOpen(false);
             setEditingUser(null);
-            alert('Data guru berhasil diupdate');
+            showAlert.success('Berhasil', 'Data guru berhasil diupdate');
         },
         onError: (error: any) => {
-            alert('Error: ' + error.message);
+            showAlert.error('Gagal', error.message);
         }
     });
 
@@ -99,12 +100,12 @@ export default function TeacherManagement() {
             
             if (error) throw error;
 
-            alert('Guru berhasil ditambahkan!');
+            showAlert.success('Berhasil', 'Guru berhasil ditambahkan!');
             setAddFormData({ email: '', password: '', full_name: '', role: 'guru' });
             setIsAddOpen(false);
             queryClient.invalidateQueries({ queryKey: ['teachers_list'] });
         } catch (error: any) {
-            alert('Gagal menambah guru: ' + error.message);
+            showAlert.error('Gagal', 'Gagal menambah guru: ' + error.message);
         } finally {
             setIsAdding(false);
         }

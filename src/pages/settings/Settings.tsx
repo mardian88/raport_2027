@@ -51,10 +51,10 @@ export default function Settings() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['settings'] });
-            alert('Pengaturan berhasil disimpan');
+            showAlert.success('Berhasil', 'Pengaturan berhasil disimpan');
         },
-        onError: (error) => {
-            alert('Gagal menyimpan: ' + error.message);
+        onError: (error: any) => {
+            showAlert.error('Gagal', 'Gagal menyimpan: ' + error.message);
         },
     });
 
@@ -74,19 +74,19 @@ export default function Settings() {
     };
 
     const handleAddGrade = () => {
-        if (!newGrade.trim() || !newMinScore.trim()) {
-            alert('Predikat dan nilai minimum harus diisi');
+        if (!newGrade || !newMinScore) {
+            showAlert.warning('Peringatan', 'Predikat dan nilai minimum harus diisi');
             return;
         }
 
-        const minScore = Number(newMinScore);
-        if (isNaN(minScore) || minScore < 0 || minScore > 100) {
-            alert('Nilai minimum harus antara 0-100');
+        const score = parseInt(newMinScore);
+        if (score < 0 || score > 100) {
+            showAlert.warning('Peringatan', 'Nilai minimum harus antara 0-100');
             return;
         }
 
         if (gradeScale[newGrade.toUpperCase()]) {
-            alert('Predikat sudah ada');
+            showAlert.warning('Peringatan', 'Predikat sudah ada');
             return;
         }
 
@@ -105,7 +105,7 @@ export default function Settings() {
 
         const minScore = Number(editMinScore);
         if (isNaN(minScore) || minScore < 0 || minScore > 100) {
-            alert('Nilai minimum harus antara 0-100');
+            showAlert.warning('Peringatan', 'Nilai minimum harus antara 0-100');
             return;
         }
 

@@ -1,10 +1,11 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { TahsinMaster, Halaqah } from '../../types';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Label } from '../../components/ui/label';
+import { showAlert } from '../../utils/sweetAlert';
 import { Plus, Trash2, GripVertical, Filter, Save } from 'lucide-react';
 import { useToast } from '../../components/ui/use-toast';
 import { Checkbox } from '../../components/ui/checkbox';
@@ -448,7 +449,7 @@ export default function TahsinManagement() {
                                             disabled={index === 0}
                                             className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
                                         >
-                                            ▲
+                                            ?
                                         </button>
                                         <GripVertical className="h-4 w-4 text-gray-400" />
                                         <button
@@ -456,7 +457,7 @@ export default function TahsinManagement() {
                                             disabled={index === tahsinItems.length - 1}
                                             className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
                                         >
-                                            ▼
+                                            ?
                                         </button>
                                     </div>
 
@@ -494,10 +495,11 @@ export default function TahsinManagement() {
 
                                     {/* Delete Button */}
                                     <Button
-                                        variant="destructive"
+                                        variant="ghost"
                                         size="sm"
-                                        onClick={() => {
-                                            if (confirm(`Hapus item "${item.nama_item}"?`)) {
+                                        className="text-red-500 hover:text-red-700"
+                                        onClick={async () => {
+                                            if (await showAlert.confirm(`Hapus item "${item.nama_item}"?`)) {
                                                 deleteMutation.mutate(item.id);
                                             }
                                         }}
@@ -523,7 +525,7 @@ export default function TahsinManagement() {
                             <li>Item <strong>Global</strong> akan muncul untuk semua Halaqah</li>
                             <li>Item <strong>per-Halaqah</strong> hanya muncul untuk Halaqah yang dipilih</li>
                             <li>Item yang dinonaktifkan tidak akan muncul di form input raport</li>
-                            <li>Gunakan tombol ▲▼ untuk mengubah urutan item</li>
+                            <li>Gunakan tombol ?? untuk mengubah urutan item</li>
                         </ul>
                     </div>
                 </CardContent>

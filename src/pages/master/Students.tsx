@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { Student, Halaqah } from '../../types';
@@ -8,6 +8,7 @@ import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Plus, Pencil, Trash2, Upload, Download } from 'lucide-react';
 import { useToast } from '../../components/ui/use-toast';
+import { showAlert } from '../../utils/sweetAlert';
 
 export default function Students() {
     const queryClient = useQueryClient();
@@ -113,8 +114,8 @@ export default function Students() {
         setIsFormOpen(true);
     };
 
-    const handleDelete = (id: string) => {
-        if (confirm('Yakin ingin menghapus santri ini?')) {
+    const handleDelete = async (id: string) => {
+        if (await showAlert.confirm('Yakin ingin menghapus santri ini?')) {
             deleteMutation.mutate(id);
         }
     };

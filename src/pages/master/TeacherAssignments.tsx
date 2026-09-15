@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/button';
@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Label } from '../../components/ui/label';
 import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '../../components/ui/use-toast';
+import { showAlert } from '../../utils/sweetAlert';
 import type { TeacherAssignment, User, Halaqah } from '../../types';
 
 export default function TeacherAssignments() {
@@ -150,8 +151,8 @@ export default function TeacherAssignments() {
         mutation.mutate(formData);
     };
 
-    const handleDelete = (id: string, teacherName: string, halaqahName: string, subject: string) => {
-        if (confirm(`Hapus penugasan ${teacherName} untuk ${subject} di ${halaqahName}?`)) {
+    const handleDelete = async (id: string, teacherName: string, halaqahName: string, subject: string) => {
+        if (await showAlert.confirm(`Hapus penugasan ${teacherName} untuk ${subject} di ${halaqahName}?`)) {
             deleteMutation.mutate(id);
         }
     };

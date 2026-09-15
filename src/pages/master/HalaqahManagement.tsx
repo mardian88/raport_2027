@@ -1,5 +1,7 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { cn } from '../../lib/utils';
+import { showAlert } from '../../utils/sweetAlert';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -69,10 +71,10 @@ export default function HalaqahManagement() {
             queryClient.invalidateQueries({ queryKey: ['halaqah'] });
             setIsOpen(false);
             resetForm();
-            alert('Data berhasil disimpan');
+            showAlert.success('Berhasil', 'Data berhasil disimpan');
         },
         onError: (error: any) => {
-            alert('Error: ' + error.message);
+            showAlert.error('Gagal', error.message);
         }
     });
 
@@ -83,7 +85,7 @@ export default function HalaqahManagement() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['halaqah'] });
-            alert('Data berhasil dihapus');
+            showAlert.success('Berhasil', 'Data berhasil dihapus');
         }
     });
 
@@ -232,8 +234,8 @@ export default function HalaqahManagement() {
                                                     variant="ghost"
                                                     size="icon"
                                                     className="text-red-500 hover:text-red-700"
-                                                    onClick={() => {
-                                                        if (confirm('Yakin ingin menghapus halaqah ini?')) {
+                                                    onClick={async () => {
+                                                        if (await showAlert.confirm('Yakin ingin menghapus halaqah ini?')) {
                                                             deleteMutation.mutate(h.id);
                                                         }
                                                     }}

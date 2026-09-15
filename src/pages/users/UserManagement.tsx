@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import {
@@ -28,6 +28,8 @@ import {
 } from '../../components/ui/select';
 import { useToast } from '../../components/ui/use-toast';
 import { Loader2, Pencil, Upload } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
+import { showAlert } from '../../utils/sweetAlert';
 import type { User } from '../../types';
 
 export default function UserManagement() {
@@ -189,7 +191,7 @@ function UserEditDialog({ open, onOpenChange, user, onSave, isSaving }: {
 
             setSignatureUrl(publicUrl);
         } catch (e: any) {
-            alert('Gagal upload: ' + e.message);
+            showAlert.error('Gagal', 'Gagal upload: ' + e.message);
         } finally {
             setIsUploading(false);
         }
