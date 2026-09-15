@@ -19,7 +19,7 @@ export default function HalaqahManagement() {
     const [formData, setFormData] = useState({
         nama: '',
         guru_id: '',
-        shift: '' as 'Siang' | 'Sore' | '',
+        shift: '' as 'Siang' | 'Sore' | 'Malam' | '',
         tahsin_items: [] as string[]
     });
 

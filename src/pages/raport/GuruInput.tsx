@@ -64,7 +64,7 @@ export default function GuruInput() {
                 .eq('teacher_id', session!.user!.id)
                 .eq('is_active', true);
             if (error) throw error;
-            return data as (TeacherAssignment & { halaqah: { id: string; nama: string; shift?: 'Siang' | 'Sore' } })[];
+            return data as (TeacherAssignment & { halaqah: { id: string; nama: string; shift?: 'Siang' | 'Sore' | 'Malam' } })[];
         }
     });
 
@@ -220,7 +220,7 @@ export default function GuruInput() {
     };
 
     // Helper function to create kedisiplinan based on shift (no Kehadiran/Ketepatan Waktu for teachers)
-    const createKedisiplinan = (shift?: 'Siang' | 'Sore' | null): Record<string, number> => {
+    const createKedisiplinan = (shift?: 'Siang' | 'Sore' | 'Malam' | 'Malam' | null): Record<string, number> => {
         const base: Record<string, number> = {
             'Tilawah & Hafalan Mandiri': 85,
             'Kebersihan': 85,

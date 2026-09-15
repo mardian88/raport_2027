@@ -23,7 +23,7 @@ const defaultAkhlak: Record<string, number> = {
 };
 
 // Helper function to create kedisiplinan based on shift
-const createKedisiplinan = (shift?: 'Siang' | 'Sore' | null): Record<string, number> => {
+const createKedisiplinan = (shift?: 'Siang' | 'Sore' | 'Malam' | 'Malam' | null): Record<string, number> => {
     const base: Record<string, number> = {
         "Kehadiran": 100, // Default 100, will be calculated based on attendance
         "Ketepatan Waktu": 100, // Manual input, default 100
@@ -166,7 +166,7 @@ export default function RaportInput() {
                 .eq('teacher_id', session!.user!.id)
                 .eq('is_active', true);
             if (error) throw error;
-            return data as (TeacherAssignment & { halaqah: { id: string; nama: string; shift?: 'Siang' | 'Sore' } })[];
+            return data as (TeacherAssignment & { halaqah: { id: string; nama: string; shift?: 'Siang' | 'Sore' | 'Malam' } })[];
         }
     });
 
