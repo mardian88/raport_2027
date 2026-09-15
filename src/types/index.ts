@@ -122,11 +122,11 @@ export interface TeacherAssignment {
     id: string;
     teacher_id: string;
     halaqah_id: string;
-    subject: 'Tahfidz' | 'Tahsin';
+    subject: 'Tahfidz' | 'Tahsin' | 'Keduanya';
     is_active: boolean;
     created_at: string;
     // Joined data
     teacher?: User;
     halaqah?: Halaqah;
-    role?: 'guru' | 'pembimbing';
+    role?: 'guru' | 'pembimbing' | 'keduanya';
 }

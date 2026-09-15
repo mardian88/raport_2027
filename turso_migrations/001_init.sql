@@ -139,7 +139,7 @@ CREATE TABLE teacher_assignments (
   teacher_id TEXT NOT NULL,
   halaqah_id TEXT NOT NULL,
   subject TEXT NOT NULL,
-  role TEXT NOT NULL CHECK(role IN ('guru','pembimbing')),
+  role TEXT NOT NULL CHECK(role IN ('guru','pembimbing','keduanya')),
   is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE,

@@ -20,9 +20,12 @@ export default function GuruInput() {
     const [searchParams] = useSearchParams();
 
     const [selectedHalaqahId, setSelectedHalaqahId] = useState<string>('');
-    const [selectedSubject, setSelectedSubject] = useState<'Tahfidz' | 'Tahsin' | ''>('');
+    const [selectedSubject, setSelectedSubject] = useState<'Tahfidz' | 'Tahsin' | 'Keduanya' | ''>('');
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
     const [activeSemester, setActiveSemester] = useState<Semester | null>(null);
+
+    const isTahfidz = selectedSubject === 'Tahfidz' || selectedSubject === 'Keduanya';
+    const isTahsin = selectedSubject === 'Tahsin' || selectedSubject === 'Keduanya';
 
     // Tahfidz State
     const [, setTahfidzScore] = useState(85);
@@ -156,7 +159,7 @@ export default function GuruInput() {
 
     // Get current assignment details for selected halaqah
     const currentAssignment = teacherAssignments?.find(a => a.halaqah_id === selectedHalaqahId);
-    const isPembimbing = currentAssignment?.role === 'pembimbing';
+    const isPembimbing = currentAssignment?.role === 'pembimbing' || currentAssignment?.role === 'keduanya';
 
     // Auto-select from URL
     useEffect(() => {
@@ -285,10 +288,11 @@ export default function GuruInput() {
                 // We should check if the saved data is actually more "complete" or just blindly load?
                 // Simplest: Just load it, but maybe show a toast or indicator?
                 // Merging logic:
-                if (selectedSubject === 'Tahfidz' && data.tahfidzProgress) {
+                if (isTahfidz && data.tahfidzProgress) {
                     setTahfidzProgress(data.tahfidzProgress);
                     if (data.tahfidzScore) setTahfidzScore(data.tahfidzScore);
-                } else if (selectedSubject === 'Tahsin') {
+                } 
+                if (isTahsin) {
                     if (data.tahsin) setTahsin(data.tahsin);
                     if (data.uasTulis !== undefined) setUasTulis(data.uasTulis);
                     if (data.uasLisan !== undefined) setUasLisan(data.uasLisan);
@@ -359,12 +363,12 @@ export default function GuruInput() {
         const timer = setTimeout(() => {
             const dataToSave = {
                 timestamp: Date.now(),
-                tahfidzScore: selectedSubject === 'Tahfidz' ? 10 : undefined, // Check how to get tahfidzScore state if needed, currently it's internal to TahfidzInput mostly or state here
+                tahfidzScore: isTahfidz ? 10 : undefined, // Check how to get tahfidzScore state if needed, currently it's internal to TahfidzInput mostly or state here
                 // Wait, tahfidzScore state is here on line 28
-                tahfidzProgress: selectedSubject === 'Tahfidz' ? tahfidzProgress : undefined,
-                tahsin: selectedSubject === 'Tahsin' ? tahsin : undefined,
-                uasTulis: selectedSubject === 'Tahsin' ? uasTulis : undefined,
-                uasLisan: selectedSubject === 'Tahsin' ? uasLisan : undefined,
+                tahfidzProgress: isTahfidz ? tahfidzProgress : undefined,
+                tahsin: isTahsin ? tahsin : undefined,
+                uasTulis: isTahsin ? uasTulis : undefined,
+                uasLisan: isTahsin ? uasLisan : undefined,
                 akhlak: isPembimbing ? akhlak : undefined,
                 kedisiplinan: isPembimbing ? kedisiplinan : undefined
             };
@@ -536,7 +540,7 @@ export default function GuruInput() {
                 semester_id: activeSemester.id,
             };
 
-            if (selectedSubject === 'Tahsin') {
+            if (isTahsin) {
                 const tahsinAvg = calculateAverage(tahsin);
                 payload.kognitif = {
                     ...currentReport?.kognitif,
@@ -553,7 +557,9 @@ export default function GuruInput() {
                 } else {
                     payload.nilai_akhir_kognitif = (finalTahfidz + tahsinAvg + uasTulis + uasLisan) / 4;
                 }
-            } else if (selectedSubject === 'Tahfidz') {
+            }
+
+            if (isTahfidz) {
                 // Calculate new Tahfidz Average from 'tahfidzProgress' state being saved
                 let total = 0;
                 let count = 0;
@@ -611,7 +617,7 @@ export default function GuruInput() {
             }
 
             // Save Tahfidz Progress if Tahfidz subject
-            if (selectedSubject === 'Tahfidz' && reportId && Object.keys(tahfidzProgress).length > 0) {
+            if (isTahfidz && reportId && Object.keys(tahfidzProgress).length > 0) {
                 const progressRecords = Object.entries(tahfidzProgress).map(([surahId, scores]) => ({
                     report_card_id: reportId,
                     surah_id: surahId,
@@ -704,7 +710,7 @@ export default function GuruInput() {
                                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                                 value={selectedSubject}
                                 onChange={(e) => {
-                                    setSelectedSubject(e.target.value as 'Tahfidz' | 'Tahsin');
+                                    setSelectedSubject(e.target.value as 'Tahfidz' | 'Tahsin' | 'Keduanya');
                                     setSelectedStudentId('');
                                 }}
                                 disabled={!selectedHalaqahId}
@@ -712,7 +718,7 @@ export default function GuruInput() {
                                 <option value="">-- Pilih Materi --</option>
                                 {availableSubjects.map((subject) => (
                                     <option key={subject} value={subject}>
-                                        {subject}
+                                        {subject === 'Keduanya' ? 'Keduanya (Tahfidz & Tahsin)' : subject}
                                     </option>
                                 ))}
                             </select>
@@ -742,7 +748,7 @@ export default function GuruInput() {
             {/* Input Fields */}
             {selectedStudentId && selectedSubject && (
                 <div className="space-y-6">
-                    {selectedSubject === 'Tahfidz' && (
+                    {isTahfidz && (
                         <Card>
                             <CardHeader>
                                 <CardTitle>Tahfidz (10-100)</CardTitle>
@@ -758,7 +764,7 @@ export default function GuruInput() {
                         </Card>
                     )}
 
-                    {selectedSubject === 'Tahsin' && (
+                    {isTahsin && (
                         <>
                             <Card>
                                 <CardHeader>

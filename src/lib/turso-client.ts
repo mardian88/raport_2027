@@ -129,6 +129,7 @@ class TursoQueryBuilder {
 
             for (const f of this.filters) {
                 let colVal = f.value;
+                if (colVal === undefined) colVal = null;
                 if (typeof colVal === 'boolean') colVal = colVal ? 1 : 0;
 
                 if (f.op === 'eq') {
@@ -306,6 +307,7 @@ class TursoInsertBuilder {
                     cols.push(k);
                     placeholders.push('?');
                     let v = row[k];
+                    if (v === undefined) v = null;
                     if (typeof v === 'boolean') v = v ? 1 : 0;
                     else if (v !== null && typeof v === 'object') v = JSON.stringify(v);
                     args.push(v);
@@ -363,7 +365,8 @@ class TursoUpdateBuilder {
             for (const k of keys) {
                 setClauses.push(k + ' = ?');
                 let v = this.updates[k];
-                if (typeof v === 'boolean') v = v ? 1 : 0;
+                if (v === undefined) v = null;
+                    if (typeof v === 'boolean') v = v ? 1 : 0;
                 else if (v !== null && typeof v === 'object') v = JSON.stringify(v);
                 args.push(v);
             }
@@ -373,6 +376,7 @@ class TursoUpdateBuilder {
 
             for (const f of this.filters) {
                 let colVal = f.value;
+                if (colVal === undefined) colVal = null;
                 if (typeof colVal === 'boolean') colVal = colVal ? 1 : 0;
 
                 if (f.op === 'eq') {
@@ -432,6 +436,7 @@ class TursoDeleteBuilder {
 
             for (const f of this.filters) {
                 let colVal = f.value;
+                if (colVal === undefined) colVal = null;
                 if (typeof colVal === 'boolean') colVal = colVal ? 1 : 0;
 
                 if (f.op === 'eq') {
@@ -498,6 +503,7 @@ class TursoUpsertBuilder {
                     cols.push(k);
                     placeholders.push('?');
                     let v = row[k];
+                    if (v === undefined) v = null;
                     if (typeof v === 'boolean') v = v ? 1 : 0;
                     else if (v !== null && typeof v === 'object') v = JSON.stringify(v);
                     args.push(v);

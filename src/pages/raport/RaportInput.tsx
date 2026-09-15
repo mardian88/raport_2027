@@ -51,7 +51,7 @@ export default function RaportInput() {
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
     const [activeSemester, setActiveSemester] = useState<Semester | null>(null);
     const [selectedHalaqahFilter, setSelectedHalaqahFilter] = useState<string>('');
-    const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<'Tahfidz' | 'Tahsin' | ''>('');
+    const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<'Tahfidz' | 'Tahsin' | 'Keduanya' | ''>('');
 
     // Form State
     const [akhlak, setAkhlak] = useState<Record<string, number>>(defaultAkhlak);
@@ -671,12 +671,11 @@ export default function RaportInput() {
                                     <select
                                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                                         value={selectedSubjectFilter}
-                                        onChange={(e) => setSelectedSubjectFilter(e.target.value as 'Tahfidz' | 'Tahsin' | '')}
+                                        onChange={(e) => setSelectedSubjectFilter(e.target.value as 'Tahfidz' | 'Tahsin' | 'Keduanya' | '')}
                                     >
                                         <option value="">-- Semua Materi --</option>
                                         {assignedSubjects.map((subject) => (
-                                            <option key={subject} value={subject}>
-                                                {subject}
+                                            <option key={subject} value={subject}>{subject === 'Keduanya' ? 'Keduanya (Tahfidz & Tahsin)' : subject}
                                             </option>
                                         ))}
                                     </select>

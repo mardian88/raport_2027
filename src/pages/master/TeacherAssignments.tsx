@@ -19,8 +19,8 @@ export default function TeacherAssignments() {
     const [formData, setFormData] = useState({
         teacher_id: '',
         halaqah_id: '',
-        subject: 'Tahfidz' as 'Tahfidz' | 'Tahsin',
-        role: 'guru' as 'guru' | 'pembimbing'
+        subject: 'Tahfidz' as 'Tahfidz' | 'Tahsin' | 'Keduanya',
+        role: 'guru' as 'guru' | 'pembimbing' | 'keduanya'
     });
 
     // Fetch all teacher assignments with joined data
@@ -219,11 +219,12 @@ export default function TeacherAssignments() {
                                 <select
                                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                                     value={formData.subject}
-                                    onChange={(e) => setFormData({ ...formData, subject: e.target.value as 'Tahfidz' | 'Tahsin' })}
+                                    onChange={(e) => setFormData({ ...formData, subject: e.target.value as 'Tahfidz' | 'Tahsin' | 'Keduanya' })}
                                     required
                                 >
                                     <option value="Tahfidz">Tahfidz</option>
                                     <option value="Tahsin">Tahsin</option>
+                                    <option value="Keduanya">Keduanya (Tahfidz & Tahsin)</option>
                                 </select>
                             </div>
                             <div className="space-y-2">
@@ -231,11 +232,12 @@ export default function TeacherAssignments() {
                                 <select
                                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                                     value={formData.role}
-                                    onChange={(e) => setFormData({ ...formData, role: e.target.value as 'guru' | 'pembimbing' })}
+                                    onChange={(e) => setFormData({ ...formData, role: e.target.value as 'guru' | 'pembimbing' | 'keduanya' })}
                                     required
                                 >
                                     <option value="guru">Guru Mata Pelajaran (Input Nilai Saja)</option>
                                     <option value="pembimbing">Pembimbing Halaqah (Input Nilai + Akhlak/Disiplin)</option>
+                                    <option value="keduanya">Keduanya (Guru Mapel + Pembimbing)</option>
                                 </select>
                             </div>
                             <div className="flex justify-end gap-2 pt-4">
@@ -295,6 +297,8 @@ export default function TeacherAssignments() {
                                         <TableCell>
                                             {assignment.role === 'pembimbing' ? (
                                                 <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs">Pembimbing</span>
+                                            ) : assignment.role === 'keduanya' ? (
+                                                <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full text-xs">Keduanya</span>
                                             ) : (
                                                 <span className="text-gray-500 text-xs">Guru Mapel</span>
                                             )}
