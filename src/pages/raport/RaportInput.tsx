@@ -876,7 +876,6 @@ export default function RaportInput() {
                                                 value={(isShiftSiang && key === "Sholat Berjamaah") ? 0 : val}
                                                 disabled={isDisabled}
                                                 onChange={(v) => !isDisabled && setKedisiplinan(prev => ({ ...prev, [key]: v }))}
-                                                disabled={isDisabled}
                                             />
                                         </div>
                                     );
