@@ -69,7 +69,7 @@ export default function RaportPrint() {
                 .from('teacher_assignments')
                 .select('*, teacher:users(*)')
                 .eq('halaqah_id', report!.student.halaqah_id)
-                .in('role', ['pembimbing', 'Keduanya'])
+                .in('role', ['pembimbing', 'keduanya'])
                 .eq('is_active', true)
                 .maybeSingle(); // Use maybeSingle to avoid 406 error if not found
             return data;
