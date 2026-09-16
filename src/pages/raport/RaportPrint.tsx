@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
@@ -69,7 +69,7 @@ export default function RaportPrint() {
                 .from('teacher_assignments')
                 .select('*, teacher:users(*)')
                 .eq('halaqah_id', report!.student.halaqah_id)
-                .eq('role', 'pembimbing')
+                .in('role', ['pembimbing', 'Keduanya'])
                 .eq('is_active', true)
                 .maybeSingle(); // Use maybeSingle to avoid 406 error if not found
             return data;
