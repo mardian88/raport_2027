@@ -235,6 +235,7 @@ CREATE TABLE report_cards (
   sakit INTEGER DEFAULT 0,
   izin INTEGER DEFAULT 0,
   alpa INTEGER DEFAULT 0,
+    jumlah_hari_efektif INTEGER,
   catatan TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
