@@ -22,28 +22,34 @@ export function CloudinaryUpload({
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+    const apiKey = import.meta.env.VITE_CLOUDINARY_API_KEY || "788299416675769";
+    const apiSecret = import.meta.env.VITE_CLOUDINARY_API_SECRET || "1YzmUcP2QKvO_-_Z6CSMCaW9nWA";
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "jx1p1p2b";
+
+    const generateSignature = async (timestamp: number, secret: string) => {
+        const str = `timestamp=${timestamp}${secret}`;
+        const encoder = new TextEncoder();
+        const data = encoder.encode(str);
+        const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    };
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        if (!cloudName || !uploadPreset) {
-            toast({
-                title: "Konfigurasi Hilang",
-                description: "VITE_CLOUDINARY_CLOUD_NAME atau VITE_CLOUDINARY_UPLOAD_PRESET belum diset di .env.",
-                variant: "destructive",
-            });
-            return;
-        }
-
         setIsUploading(true);
 
         try {
+            const timestamp = Math.floor(Date.now() / 1000);
+            const signature = await generateSignature(timestamp, apiSecret);
+
             const formData = new FormData();
             formData.append('file', file);
-            formData.append('upload_preset', uploadPreset);
+            formData.append('api_key', apiKey);
+            formData.append('timestamp', timestamp.toString());
+            formData.append('signature', signature);
 
             const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
                 method: 'POST',
