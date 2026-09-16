@@ -867,12 +867,14 @@ export default function RaportInput() {
 
                             <div className="space-y-4">
                                 {Object.entries(kedisiplinan).map(([key, val]) => {
-                                    const isDisabled = isShiftSiang && key === "Sholat Berjamaah";
+                                    const isKehadiran = key === "Kehadiran";
+                                    const isDisabled = (isShiftSiang && key === "Sholat Berjamaah") || isKehadiran;
                                     return (
                                         <div key={key} className={isDisabled ? 'opacity-50' : ''}>
                                             <ScoreInput
-                                                label={key + (isDisabled ? ' (Tidak dinilai - Shift Siang)' : '')}
-                                                value={isDisabled ? 0 : val}
+                                                label={key + ((isShiftSiang && key === "Sholat Berjamaah") ? ' (Tidak dinilai - Shift Siang)' : isKehadiran ? ' (Otomatis)' : '')}
+                                                value={(isShiftSiang && key === "Sholat Berjamaah") ? 0 : val}
+                                                disabled={isDisabled}
                                                 onChange={(v) => !isDisabled && setKedisiplinan(prev => ({ ...prev, [key]: v }))}
                                                 disabled={isDisabled}
                                             />
