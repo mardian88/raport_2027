@@ -204,14 +204,14 @@ class TursoQueryBuilder {
                     halaqah_data: allHalaqah.find(h => h.id === st.halaqah_id) || null
                 }));
             } else if (this.tableName === 'halaqah' && this.selectedFields.includes('guru')) {
-                const userRes = await tursoDb.execute('SELECT id, email, full_name FROM users');
+                const userRes = await tursoDb.execute('SELECT id, email, full_name, signature_url FROM users');
                 const allUsers = userRes.rows.map(r => formatRow(r, 'users'));
                 rows = rows.map(h => ({
                     ...h,
                     guru: allUsers.find(u => u.id === h.guru_id) || null
                 }));
             } else if (this.tableName === 'teacher_assignments') {
-                const userRes = await tursoDb.execute('SELECT id, email, full_name, role FROM users');
+                const userRes = await tursoDb.execute('SELECT id, email, full_name, role, signature_url FROM users');
                 const halRes = await tursoDb.execute('SELECT * FROM halaqah');
                 const allUsers = userRes.rows.map(r => formatRow(r, 'users'));
                 const allHalaqah = halRes.rows.map(r => formatRow(r, 'halaqah'));
