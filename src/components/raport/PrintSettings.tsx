@@ -79,26 +79,36 @@ export function PrintSettings({
         }
     };
 
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
     const handleFileUpload = async (file: File, type: 'logo' | 'head_sig' | 'teacher_sig') => {
         if (!file) return;
+
+        if (!cloudName || !uploadPreset) {
+            alert("Konfigurasi Hilang: VITE_CLOUDINARY_CLOUD_NAME atau VITE_CLOUDINARY_UPLOAD_PRESET belum diset di .env.");
+            return;
+        }
+
         setIsUploading(true);
 
         try {
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${type}_${Date.now()}.${fileExt}`;
-            const filePath = `${fileName}`;
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', uploadPreset);
 
-            // Upload to Supabase Storage
-            const { error: uploadError } = await supabase.storage
-                .from('raport-assets')
-                .upload(filePath, file);
+            const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+                method: 'POST',
+                body: formData,
+            });
 
-            if (uploadError) throw uploadError;
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error?.message || 'Gagal mengupload gambar');
+            }
 
-            // Get Public URL
-            const { data: { publicUrl } } = supabase.storage
-                .from('raport-assets')
-                .getPublicUrl(filePath);
+            const data = await response.json();
+            const publicUrl = data.secure_url;
 
             // Update Database
             if (type === 'logo') {
@@ -113,7 +123,6 @@ export function PrintSettings({
             }
 
             onSettingsChange();
-            // alert('Upload berhasil!'); 
         } catch (e: any) {
             console.error('Upload failed:', e);
             alert('Gagal upload: ' + (e.message || e.error_description || JSON.stringify(e)));
