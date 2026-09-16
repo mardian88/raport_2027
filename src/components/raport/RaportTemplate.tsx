@@ -1,4 +1,4 @@
-﻿import type { ReportCard, SettingsLembaga, User, TahsinMaster, Student, Semester, AcademicYear, TahfidzProgress } from '../../types';
+import type { ReportCard, SettingsLembaga, User, TahsinMaster, Student, Semester, AcademicYear, TahfidzProgress } from '../../types';
 import { formatScore, getPredikat, getMotivationalMessage, getCategoryNote, calculateFinalScore } from '../../utils/grading';
 
 interface RaportTemplateProps {
@@ -147,28 +147,34 @@ export function RaportTemplate({
             {/* IDENTITAS */}
             <div className="grid grid-cols-2 gap-x-8 gap-y-2 mb-6 text-sm">
                 <div className="flex">
-                    <span className="w-32">Nama Santri</span>
-                    <span>: {student.nama}</span>
+                    <span className="w-32 flex-shrink-0">Nama Santri</span>
+                    <span className="w-4 flex-shrink-0">:</span>
+                    <span className="flex-1">{student.nama}</span>
                 </div>
                 <div className="flex">
-                    <span className="w-32">Tahun Ajaran</span>
-                    <span>: {academicYear}</span>
+                    <span className="w-32 flex-shrink-0">Tahun Ajaran</span>
+                    <span className="w-4 flex-shrink-0">:</span>
+                    <span className="flex-1">{academicYear}</span>
                 </div>
                 <div className="flex">
-                    <span className="w-32">Nomor Induk</span>
-                    <span>: {student.nis || '-'}</span>
+                    <span className="w-32 flex-shrink-0">Nomor Induk</span>
+                    <span className="w-4 flex-shrink-0">:</span>
+                    <span className="flex-1">{student.nis || '-'}</span>
                 </div>
                 <div className="flex">
-                    <span className="w-32">Semester</span>
-                    <span>: {semester.nama}</span>
+                    <span className="w-32 flex-shrink-0">Semester</span>
+                    <span className="w-4 flex-shrink-0">:</span>
+                    <span className="flex-1">{semester.nama}</span>
                 </div>
                 <div className="flex">
-                    <span className="w-32">Halaqah</span>
-                    <span>: {student.halaqah_data?.nama || student.halaqah || '-'}</span>
+                    <span className="w-32 flex-shrink-0">Halaqah</span>
+                    <span className="w-4 flex-shrink-0">:</span>
+                    <span className="flex-1">{student.halaqah_data?.nama || student.halaqah || '-'}</span>
                 </div>
                 <div className="flex">
-                    <span className="w-32">Guru Pembimbing</span>
-                    <span>: {guruPembimbing?.full_name || '-'}</span>
+                    <span className="w-32 flex-shrink-0">Guru Pembimbing</span>
+                    <span className="w-4 flex-shrink-0">:</span>
+                    <span className="flex-1">{guruPembimbing?.full_name || '-'}</span>
                 </div>
             </div>
 
@@ -384,7 +390,7 @@ export function RaportTemplate({
                             <p className="font-bold text-xl">
                                 {(() => {
                                     // C-1 + C-2 FIX: gunakan calculateFinalScore dengan weighted
-                                    // (bobot dari settings — sesuai UI Pengaturan Lembaga).
+                                    // (bobot dari settings � sesuai UI Pengaturan Lembaga).
                                     // Konsisten dengan LegerNilai dan view DB.
                                     const finalScore = calculateFinalScore(
                                         report.nilai_akhir_akhlak,
