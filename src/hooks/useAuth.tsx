@@ -1,6 +1,23 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import type { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { tursoClient as db } from '../lib/turso-client';
+
+export interface User {
+    id: string;
+    email?: string;
+    role?: string;
+    aud?: string;
+    app_metadata?: any;
+    user_metadata?: any;
+    created_at?: string;
+    [key: string]: any;
+}
+
+export interface Session {
+    access_token: string;
+    refresh_token?: string;
+    user: User | null;
+    [key: string]: any;
+}
 
 interface AuthContextType {
     session: Session | null;
@@ -9,8 +26,8 @@ interface AuthContextType {
     signOut: () => Promise<void>;
 }
 
-// Tipe user minimal (kompatibel dengan Supabase User shape)
-const fakeAdminUser: any = {
+// Tipe user minimal (kompatibel dengan db User shape)
+const fakeAdminUser: User = {
     id: 'bypass-admin-local',
     email: 'admin@rqm.com',
     role: 'admin',
@@ -20,7 +37,7 @@ const fakeAdminUser: any = {
     created_at: new Date().toISOString(),
 };
 
-const fakeSession: any = {
+const fakeSession: Session = {
     access_token: 'bypass-token',
     refresh_token: 'bypass-refresh',
     expires_in: 999999,
@@ -41,9 +58,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Cek session via supabase.auth.getSession() — bekerja di semua mode
+        // Cek session via db.auth.getSession() — bekerja di semua mode
         // (local-db: selalu return fake session; api: cek cookie)
-        supabase.auth.getSession().then(({ data }) => {
+        db.auth.getSession().then(({ data }) => {
             if (data.session) {
                 setSession(data.session as Session);
                 setUser((data.session as any).user as User);
@@ -59,16 +76,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
 
         // Listen untuk perubahan session
-        const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
+        const { data: sub } = db.auth.onAuthStateChange((_event, sess) => {
             setSession(sess as Session | null);
             setUser((sess as any)?.user as User | null);
         });
 
-        return () => sub?.subscription?.unsubscribe?.();
+        return () => { sub?.subscription?.unsubscribe?.(); };
     }, []);
 
     const signOut = async () => {
-        await supabase.auth.signOut();
+        await db.auth.signOut();
         window.location.reload();
     };
 

@@ -65,8 +65,7 @@ export function requireRole(...roles: SessionPayload['role'][]) {
 export function errorHandler(err: Error, c: Context) {
     console.error(`[ERROR] ${c.req.method} ${c.req.path}:`, err);
     return c.json({
-        error: err.message || 'Internal Server Error',
-        path: c.req.path,
+        error: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error',
     }, 500);
 }
 

@@ -83,11 +83,39 @@ studentsRouter.post('/', requireRole('admin'), async (c) => {
 });
 
 studentsRouter.patch('/:id', requireRole('admin', 'guru'), async (c) => {
+    const user = c.get('user');
     const id = c.req.param('id');
     const body = await c.req.json();
     const parsed = studentSchema.partial().safeParse(body);
     if (!parsed.success) {
         return c.json({ error: 'Validasi gagal' }, 400);
+    }
+    
+    // AUTHORIZATION CHECK (BOLA)
+    if (user && user.role !== 'admin') {
+        const studentCheck = await db.execute({
+            sql: `SELECT halaqah_id FROM students WHERE id = ? LIMIT 1`,
+            args: [id || '']
+        });
+        
+        if (studentCheck.rows.length === 0) {
+            return c.json({ error: 'Santri tidak ditemukan' }, 404);
+        }
+        
+        const halaqahId = (studentCheck.rows[0] as any).halaqah_id;
+        
+        if (!halaqahId) {
+            return c.json({ error: 'Forbidden: Santri belum memiliki halaqah' }, 403);
+        }
+        
+        const assignCheck = await db.execute({
+            sql: `SELECT id FROM teacher_assignments WHERE teacher_id = ? AND halaqah_id = ? AND is_active = 1 LIMIT 1`,
+            args: [user.userId, halaqahId]
+        });
+        
+        if (assignCheck.rows.length === 0) {
+            return c.json({ error: 'Forbidden: Anda tidak ditugaskan ke halaqah santri ini' }, 403);
+        }
     }
 
     const fields = Object.keys(parsed.data);

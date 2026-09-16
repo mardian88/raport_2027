@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import type { Student, Halaqah } from '../../types';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -10,14 +10,29 @@ import { Plus, Pencil, Trash2, Upload, Download, Search, Trash } from 'lucide-re
 import { useToast } from '../../components/ui/use-toast';
 import { showAlert } from '../../utils/sweetAlert';
 import * as XLSX from 'xlsx';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function Students() {
+    const { user } = useAuth();
     const queryClient = useQueryClient();
     const { toast } = useToast();
     const [isEditing, setIsEditing] = useState<Student | null>(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
     const [formData, setFormData] = useState<Partial<Student>>({});
+
+    const { data: assignments } = useQuery({
+        queryKey: ['teacher_assignments', user?.id],
+        enabled: user?.role === 'guru' || user?.role === 'pembimbing',
+        queryFn: async () => {
+            const { data } = await db
+                .from('teacher_assignments')
+                .select('halaqah_id')
+                .eq('teacher_id', user?.id)
+                .eq('is_active', true);
+            return data?.map(d => d.halaqah_id) || [];
+        }
+    });
 
     // Pagination & Table states
     const [currentPage, setCurrentPage] = useState(1);
@@ -33,7 +48,7 @@ export default function Students() {
     const { data: students, isLoading } = useQuery({
         queryKey: ['students'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('students')
                 .select('*, halaqah_data:halaqah(id, nama)')
                 .order('nama', { ascending: true });
@@ -45,7 +60,7 @@ export default function Students() {
     const { data: halaqahList } = useQuery({
         queryKey: ['halaqah'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('halaqah')
                 .select('*')
                 .eq('is_active', true)
@@ -57,7 +72,7 @@ export default function Students() {
 
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await supabase.from('students').delete().eq('id', id);
+            const { error } = await db.from('students').delete().eq('id', id);
             if (error) throw error;
         },
         onSuccess: () => {
@@ -68,7 +83,7 @@ export default function Students() {
 
     const bulkDeleteMutation = useMutation({
         mutationFn: async (ids: string[]) => {
-            const { error } = await supabase.from('students').delete().in('id', ids);
+            const { error } = await db.from('students').delete().in('id', ids);
             if (error) throw error;
         },
         onSuccess: () => {
@@ -86,13 +101,13 @@ export default function Students() {
             };
 
             if (isEditing?.id) {
-                const { error } = await supabase
+                const { error } = await db
                     .from('students')
                     .update(payload)
                     .eq('id', isEditing.id);
                 if (error) throw error;
             } else {
-                const { error } = await supabase.from('students').insert([payload]);
+                const { error } = await db.from('students').insert([payload]);
                 if (error) throw error;
             }
         },
@@ -106,7 +121,7 @@ export default function Students() {
 
     const importMutation = useMutation({
         mutationFn: async (studentsToImport: Partial<Student>[]) => {
-            const { error } = await supabase.from('students').insert(studentsToImport);
+            const { error } = await db.from('students').insert(studentsToImport);
             if (error) throw error;
         },
         onSuccess: (_, variables) => {
@@ -150,7 +165,7 @@ export default function Students() {
 
     const handleDeleteAll = async () => {
         if (await showAlert.confirm('PERINGATAN: Yakin ingin menghapus SEMUA data santri? Tindakan ini tidak bisa dibatalkan.')) {
-            const { error } = await supabase.from('students').delete().in('id', students?.map(s => s.id) || []);
+            const { error } = await db.from('students').delete().in('id', students?.map(s => s.id) || []);
             if (!error) {
                 queryClient.invalidateQueries({ queryKey: ['students'] });
                 setSelectedIds([]);
@@ -267,6 +282,13 @@ export default function Students() {
     const filteredStudents = useMemo(() => {
         if (!students) return [];
         return students.filter(s => {
+            // Role-based filtering
+            if (user?.role !== 'admin') {
+                if (!assignments?.includes(s.halaqah_id)) {
+                    return false;
+                }
+            }
+            
             const matchNama = s.nama.toLowerCase().includes(filters.nama.toLowerCase());
             const matchNis = (s.nis || '').toLowerCase().includes(filters.nis.toLowerCase());
             const halaqahName = s.halaqah_data?.nama || s.halaqah || '';
@@ -274,7 +296,7 @@ export default function Students() {
             const matchShift = (s.shift || '').toLowerCase().includes(filters.shift.toLowerCase());
             return matchNama && matchNis && matchHalaqah && matchShift;
         });
-    }, [students, filters]);
+    }, [students, filters, user?.role, assignments]);
 
     // Pagination Logic
     const totalPages = itemsPerPage === 'all' ? 1 : Math.ceil(filteredStudents.length / itemsPerPage);
@@ -316,14 +338,16 @@ export default function Students() {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h1 className="text-2xl font-bold">Data Santri</h1>
-                <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" onClick={() => setIsImportOpen(true)}>
-                        <Upload className="mr-2 h-4 w-4" /> Import Massal
-                    </Button>
-                    <Button onClick={() => { setIsEditing(null); setFormData({}); setIsFormOpen(true); }}>
-                        <Plus className="mr-2 h-4 w-4" /> Tambah Santri
-                    </Button>
-                </div>
+                {user?.role === 'admin' && (
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" onClick={() => setIsImportOpen(true)} className="min-h-[44px]">
+                            <Upload className="mr-2 h-4 w-4" /> Import Massal
+                        </Button>
+                        <Button onClick={() => { setIsEditing(null); setFormData({}); setIsFormOpen(true); }} className="min-h-[44px]">
+                            <Plus className="mr-2 h-4 w-4" /> Tambah Santri
+                        </Button>
+                    </div>
+                )}
             </div>
 
             {isFormOpen && (
@@ -423,14 +447,16 @@ export default function Students() {
             <Card className="overflow-hidden border-border/40 shadow-sm">
                 <div className="p-4 bg-gray-50/50 border-b flex flex-wrap gap-4 items-center justify-between">
                     <div className="flex items-center gap-2">
-                        {selectedIds.length > 0 && (
-                            <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+                        {user?.role === 'admin' && selectedIds.length > 0 && (
+                            <Button variant="destructive" size="sm" onClick={handleBulkDelete} className="min-h-[44px]">
                                 <Trash className="mr-2 h-4 w-4" /> Hapus {selectedIds.length} Terpilih
                             </Button>
                         )}
-                        <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={handleDeleteAll}>
-                            <Trash2 className="mr-2 h-4 w-4" /> Hapus Semua
-                        </Button>
+                        {user?.role === 'admin' && (
+                            <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50 min-h-[44px]" onClick={handleDeleteAll}>
+                                <Trash2 className="mr-2 h-4 w-4" /> Hapus Semua
+                            </Button>
+                        )}
                     </div>
                     
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -452,7 +478,7 @@ export default function Students() {
                     </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-sm text-left">
                         <thead className="bg-gray-50/80 border-b">
                             {/* Column Titles */}
@@ -568,9 +594,11 @@ export default function Students() {
                                                 <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleEdit(student)}>
                                                     <Pencil className="h-4 w-4" />
                                                 </Button>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(student.id)}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
+                                                {user?.role === 'admin' && (
+                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(student.id)}>
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -578,6 +606,60 @@ export default function Students() {
                             )}
                         </tbody>
                     </table>
+                </div>
+
+                {/* Mobile Cards (antislop-layoutmobile) */}
+                <div className="grid grid-cols-1 gap-4 p-4 md:hidden bg-gray-50/30">
+                    {isLoading ? (
+                        <div className="text-center text-gray-500 py-8">Memuat data...</div>
+                    ) : paginatedStudents.length === 0 ? (
+                        <div className="text-center text-gray-500 py-12">Tidak ada data yang sesuai.</div>
+                    ) : (
+                        paginatedStudents.map((student) => (
+                            <div key={student.id} className="bg-white border rounded-xl shadow-sm p-4 flex flex-col gap-3">
+                                <div className="flex justify-between items-start">
+                                    <div className="flex gap-3 items-start">
+                                        <input 
+                                            type="checkbox" 
+                                            className="rounded border-gray-300 mt-1 min-w-[20px] min-h-[20px]"
+                                            checked={selectedIds.includes(student.id)}
+                                            onChange={(e) => handleSelectRow(e, student.id)}
+                                        />
+                                        <div>
+                                            <h3 className="font-semibold text-gray-900 leading-tight">{student.nama}</h3>
+                                            <p className="text-sm text-gray-500 mt-1">NIS: {student.nis || '-'}</p>
+                                        </div>
+                                    </div>
+                                    <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded-md">
+                                        {student.shift || 'Sore'}
+                                    </span>
+                                </div>
+                                
+                                <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
+                                    <div>
+                                        {student.halaqah_data?.nama || student.halaqah ? (
+                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                                                {student.halaqah_data?.nama || student.halaqah}
+                                            </span>
+                                        ) : (
+                                            <span className="text-gray-400 italic text-xs">Belum ditentukan</span>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="flex gap-2">
+                                        <Button size="sm" variant="outline" className="h-10 w-10 p-0" onClick={() => handleEdit(student)}>
+                                            <Pencil className="h-4 w-4 text-gray-600" />
+                                        </Button>
+                                        {user?.role === 'admin' && (
+                                            <Button size="sm" variant="outline" className="h-10 w-10 p-0 border-red-200 text-red-500 hover:bg-red-50" onClick={() => handleDelete(student.id)}>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
                 
                 {/* Pagination Controls */}

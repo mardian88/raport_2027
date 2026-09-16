@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import {
     Table,
     TableBody,
@@ -42,7 +42,7 @@ export default function UserManagement() {
     const { data: users, isLoading } = useQuery({
         queryKey: ['users'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('users')
                 .select('*');
             if (error) throw error;
@@ -53,7 +53,7 @@ export default function UserManagement() {
     // Update User Mutation
     const updateMutation = useMutation({
         mutationFn: async (vars: { id: string; full_name: string; role: string; signature_url?: string }) => {
-            const { error } = await supabase
+            const { error } = await db
                 .from('users')
                 .update({
                     full_name: vars.full_name,
@@ -180,12 +180,12 @@ function UserEditDialog({ open, onOpenChange, user, onSave, isSaving }: {
         try {
             const fileExt = file.name.split('.').pop();
             const fileName = `sig_${Date.now()}.${fileExt}`;
-            const { error: uploadError } = await supabase.storage
+            const { error: uploadError } = await db.storage
                 .from('raport-assets')
                 .upload(fileName, file);
             if (uploadError) throw uploadError;
 
-            const { data: { publicUrl } } = supabase.storage
+            const { data: { publicUrl } } = db.storage
                 .from('raport-assets')
                 .getPublicUrl(fileName);
 

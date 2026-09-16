@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Label } from '../../components/ui/label';
 import { Trophy, Medal, Award, Crown } from 'lucide-react';
@@ -26,7 +26,7 @@ export default function Peringkat() {
         queryKey: ['teacher_assignments', session?.user?.id],
         enabled: !!session?.user?.id,
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('teacher_assignments')
                 .select('*')
                 .eq('teacher_id', session!.user!.id)
@@ -43,7 +43,7 @@ export default function Peringkat() {
     const { data: semesterData } = useQuery({
         queryKey: ['active_semester'],
         queryFn: async () => {
-            const { data } = await supabase
+            const { data } = await db
                 .from('semesters')
                 .select('*, academic_year:academic_years(*)')
                 .eq('is_active', true)
@@ -56,7 +56,7 @@ export default function Peringkat() {
     const { data: halaqahList } = useQuery({
         queryKey: ['halaqah', assignedHalaqahIds],
         queryFn: async () => {
-            let query = supabase
+            let query = db
                 .from('halaqah')
                 .select('*')
                 .eq('is_active', true);
@@ -76,26 +76,46 @@ export default function Peringkat() {
         queryKey: ['rankings', selectedHalaqahId, semesterData?.id, assignedHalaqahIds],
         enabled: !!semesterData?.id,
         queryFn: async () => {
-            let query = supabase
+            const { data: rc, error } = await db
                 .from('report_cards')
-                .select(`
-                    student_id,
-                    students!inner(nama, nis, halaqah_id, halaqah:halaqah(nama)),
-                    kognitif,
-                    tahfidz_progress(kb, kh)
-                `)
+                .select('*')
                 .eq('semester_id', semesterData!.id);
 
-            if (selectedHalaqahId) {
-                // Filter by specific halaqah if selected
-                query = query.eq('students.halaqah_id', selectedHalaqahId);
-            } else if (teacherAssignments && teacherAssignments.length > 0 && assignedHalaqahIds.length > 0) {
-                // For guru role: filter by assigned halaqahs when "Semua Halaqah" is selected
-                query = query.in('students.halaqah_id', assignedHalaqahIds);
-            }
-
-            const { data, error } = await query;
             if (error) throw error;
+            if (!rc) return [];
+
+            // Fetch students
+            const studentIds = rc.map((r: any) => r.student_id);
+            const { data: students } = await db.from('students').select('*').in('id', studentIds);
+            
+            // Fetch halaqah
+            const halaqahIds = students?.map((s: any) => s.halaqah_id).filter(Boolean) || [];
+            const { data: halaqahs } = await db.from('halaqah').select('*').in('id', halaqahIds);
+            
+            // Fetch tahfidz progress
+            const rcIds = rc.map((r: any) => r.id);
+            const { data: tp } = await db.from('tahfidz_progress').select('*').in('report_card_id', rcIds);
+
+            // Stitch them together
+            const data = rc
+                .map((row: any) => {
+                    const student = students?.find((s: any) => s.id === row.student_id);
+                    if (student) {
+                        student.halaqah = halaqahs?.find((h: any) => h.id === student.halaqah_id);
+                    }
+                    return {
+                        ...row,
+                        students: student,
+                        tahfidz_progress: tp?.filter((t: any) => t.report_card_id === row.id) || []
+                    };
+                })
+                .filter((row: any) => {
+                    const student = row.students;
+                    if (!student?.is_active) return false;
+                    if (selectedHalaqahId) return student.halaqah_id === selectedHalaqahId;
+                    if (assignedHalaqahIds.length > 0) return assignedHalaqahIds.includes(student.halaqah_id);
+                    return true;
+                });
 
             // Process and calculate scores
             const processed = data?.map((item: any) => {

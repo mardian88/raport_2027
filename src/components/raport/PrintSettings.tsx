@@ -1,10 +1,10 @@
-﻿import { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { Settings, X, Upload, Save, Palette, FileText, Image as ImageIcon } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import type { SettingsLembaga, User } from '../../types';
 
 interface PrintSettingsProps {
@@ -61,7 +61,7 @@ export function PrintSettings({
 
     const handleSaveKop = async () => {
         try {
-            const { error } = await supabase
+            const { error } = await db
                 .from('settings_lembaga')
                 .update({
                     nama_lembaga: namaLembaga,
@@ -112,13 +112,13 @@ export function PrintSettings({
 
             // Update Database
             if (type === 'logo') {
-                const { error } = await supabase.from('settings_lembaga').update({ logo_url: publicUrl }).eq('id', settings.id);
+                const { error } = await db.from('settings_lembaga').update({ logo_url: publicUrl }).eq('id', settings.id);
                 if (error) throw error;
             } else if (type === 'head_sig') {
-                const { error } = await supabase.from('settings_lembaga').update({ signature_url: publicUrl }).eq('id', settings.id);
+                const { error } = await db.from('settings_lembaga').update({ signature_url: publicUrl }).eq('id', settings.id);
                 if (error) throw error;
             } else if (type === 'teacher_sig' && teacher) {
-                const { error } = await supabase.from('users').update({ signature_url: publicUrl }).eq('id', teacher.id);
+                const { error } = await db.from('users').update({ signature_url: publicUrl }).eq('id', teacher.id);
                 if (error) throw error;
             }
 

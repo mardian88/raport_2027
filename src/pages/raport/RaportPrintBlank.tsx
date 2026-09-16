@@ -1,6 +1,6 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import type { SettingsLembaga } from '../../types';
 import { PrintSettings } from '../../components/raport/PrintSettings';
 
@@ -14,7 +14,7 @@ export default function RaportPrintBlank() {
     const { data: settings } = useQuery({
         queryKey: ['settings'],
         queryFn: async () => {
-            const { data } = await supabase.from('settings_lembaga').select('*').single();
+            const { data } = await db.from('settings_lembaga').select('*').single();
             return data as SettingsLembaga;
         }
     });

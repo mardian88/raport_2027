@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import type { TahsinMaster, Halaqah } from '../../types';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -25,7 +25,7 @@ export default function TahsinManagement() {
     const { data: halaqahList } = useQuery({
         queryKey: ['halaqah_list'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('halaqah')
                 .select('*')
                 .eq('is_active', true)
@@ -39,7 +39,7 @@ export default function TahsinManagement() {
     const { data: tahsinItems, isLoading } = useQuery({
         queryKey: ['tahsin_master', selectedHalaqah],
         queryFn: async () => {
-            let query = supabase
+            let query = db
                 .from('tahsin_master')
                 .select('*')
                 .order('urutan');
@@ -61,7 +61,7 @@ export default function TahsinManagement() {
         queryKey: ['tahsin_delegation', delegationHalaqah],
         enabled: !!delegationHalaqah,
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('tahsin_master')
                 .select('*')
                 .or(`halaqah_id.is.null,halaqah_id.eq.${delegationHalaqah}`)
@@ -77,7 +77,7 @@ export default function TahsinManagement() {
         queryKey: ['halaqah_detail', delegationHalaqah],
         enabled: !!delegationHalaqah,
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('halaqah')
                 .select('tahsin_items')
                 .eq('id', delegationHalaqah)
@@ -100,7 +100,7 @@ export default function TahsinManagement() {
     const addMutation = useMutation({
         mutationFn: async ({ nama, halaqah_id }: { nama: string; halaqah_id: string | null }) => {
             const maxUrutan = tahsinItems?.reduce((max, item) => Math.max(max, item.urutan), 0) || 0;
-            const { error } = await supabase
+            const { error } = await db
                 .from('tahsin_master')
                 .insert([{
                     nama_item: nama,
@@ -113,7 +113,7 @@ export default function TahsinManagement() {
 
             // Auto-activate for the specific Halaqah if applicable
             if (halaqah_id && halaqah_id !== 'global') {
-                const { data: hData } = await supabase
+                const { data: hData } = await db
                     .from('halaqah')
                     .select('tahsin_items')
                     .eq('id', halaqah_id)
@@ -122,7 +122,7 @@ export default function TahsinManagement() {
                 const currentItems = hData?.tahsin_items || [];
                 // Avoid duplicates just in case
                 if (!currentItems.includes(nama)) {
-                    await supabase
+                    await db
                         .from('halaqah')
                         .update({ tahsin_items: [...currentItems, nama] })
                         .eq('id', halaqah_id);
@@ -151,7 +151,7 @@ export default function TahsinManagement() {
     // Toggle active status
     const toggleMutation = useMutation({
         mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
-            const { error } = await supabase
+            const { error } = await db
                 .from('tahsin_master')
                 .update({ is_active })
                 .eq('id', id);
@@ -171,7 +171,7 @@ export default function TahsinManagement() {
     // Delete item
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await supabase
+            const { error } = await db
                 .from('tahsin_master')
                 .delete()
                 .eq('id', id);
@@ -197,7 +197,7 @@ export default function TahsinManagement() {
             }));
 
             for (const update of updates) {
-                await supabase
+                await db
                     .from('tahsin_master')
                     .update({ urutan: update.urutan })
                     .eq('id', update.id);
@@ -218,7 +218,7 @@ export default function TahsinManagement() {
     const saveDelegationMutation = useMutation({
         mutationFn: async () => {
             if (!delegationHalaqah) return;
-            const { error } = await supabase
+            const { error } = await db
                 .from('halaqah')
                 .update({ tahsin_items: delegationItems })
                 .eq('id', delegationHalaqah);

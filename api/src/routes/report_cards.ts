@@ -136,6 +136,7 @@ function calculateAverage(scores: Record<string, number>): number {
 }
 
 reportCardsRouter.post('/', requireRole('admin', 'guru', 'pembimbing'), async (c) => {
+    const user = c.get('user');
     const body = await c.req.json();
     const parsed = reportCardSchema.safeParse(body);
     if (!parsed.success) {
@@ -143,6 +144,34 @@ reportCardsRouter.post('/', requireRole('admin', 'guru', 'pembimbing'), async (c
     }
 
     const data = parsed.data;
+
+    // AUTHORIZATION CHECK (BOLA)
+    if (user && user.role !== 'admin') {
+        const studentCheck = await db.execute({
+            sql: `SELECT halaqah_id FROM students WHERE id = ? LIMIT 1`,
+            args: [data.student_id]
+        });
+        
+        if (studentCheck.rows.length === 0) {
+            return c.json({ error: 'Santri tidak ditemukan' }, 404);
+        }
+        
+        const halaqahId = (studentCheck.rows[0] as any).halaqah_id;
+        
+        if (!halaqahId) {
+            return c.json({ error: 'Forbidden: Santri belum memiliki halaqah' }, 403);
+        }
+        
+        const assignCheck = await db.execute({
+            sql: `SELECT id FROM teacher_assignments WHERE teacher_id = ? AND halaqah_id = ? AND is_active = 1 LIMIT 1`,
+            args: [user.userId, halaqahId]
+        });
+        
+        if (assignCheck.rows.length === 0) {
+            return c.json({ error: 'Forbidden: Anda tidak ditugaskan ke halaqah santri ini' }, 403);
+        }
+    }
+
     const nilaiAkhirAkhlak = calculateAverage(data.akhlak);
     const nilaiAkhirKedisiplinan = calculateAverage(data.kedisiplinan);
     const nilaiAkhirKognitif = calculateAverage(data.kognitif);

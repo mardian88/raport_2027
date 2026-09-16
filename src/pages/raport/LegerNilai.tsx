@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import { Card, CardContent } from '../../components/ui/card';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
@@ -44,7 +44,7 @@ export default function LegerNilai() {
         queryKey: ['teacher_assignments', session?.user?.id],
         enabled: !!session?.user?.id,
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('teacher_assignments')
                 .select('*')
                 .eq('teacher_id', session!.user!.id)
@@ -59,7 +59,7 @@ export default function LegerNilai() {
     const { data: semesterData } = useQuery({
         queryKey: ['active_semester'],
         queryFn: async () => {
-            const { data } = await supabase.from('semesters').select('*, academic_year:academic_years(*)').eq('is_active', true).single();
+            const { data } = await db.from('semesters').select('*, academic_year:academic_years(*)').eq('is_active', true).single();
             return data as Semester & { academic_year: any };
         }
     });
@@ -67,7 +67,7 @@ export default function LegerNilai() {
     const { data: halaqahList } = useQuery({
         queryKey: ['halaqah', assignedHalaqahIds],
         queryFn: async () => {
-            let query = supabase
+            let query = db
                 .from('halaqah')
                 .select('*')
                 .eq('is_active', true);
@@ -93,7 +93,7 @@ export default function LegerNilai() {
     const { data: settings } = useQuery({
         queryKey: ['settings'],
         queryFn: async () => {
-            const { data } = await supabase.from('settings_lembaga').select('*').single();
+            const { data } = await db.from('settings_lembaga').select('*').single();
             return data;
         }
     });
@@ -102,32 +102,34 @@ export default function LegerNilai() {
         queryKey: ['leger', selectedHalaqahId, semesterData?.id, assignedHalaqahIds],
         enabled: !!semesterData?.id,
         queryFn: async () => {
-            let query = supabase
+            const { data: rc, error } = await db
                 .from('report_cards')
-                .select(`
-                    student_id,
-                    nilai_akhir_akhlak,
-                    nilai_akhir_kedisiplinan,
-                    nilai_akhir_kognitif,
-                    semester_id,
-                    students!inner (
-                        id,
-                        nama,
-                        nis,
-                        halaqah_id,
-                        is_active,
-                        halaqah_data:halaqah (
-                            id,
-                            nama
-                        )
-                    )
-                `)
+                .select('*')
                 .eq('semester_id', semesterData!.id);
 
-            const { data, error } = await query;
             if (error) throw error;
+            if (!rc) return [];
 
-            return (data || [])
+            // Fetch students
+            const studentIds = rc.map((r: any) => r.student_id);
+            const { data: students } = await db.from('students').select('*').in('id', studentIds);
+            
+            // Fetch halaqah
+            const halaqahIds = students?.map((s: any) => s.halaqah_id).filter(Boolean) || [];
+            const { data: halaqahs } = await db.from('halaqah').select('*').in('id', halaqahIds);
+
+            // Stitch them together
+            const formattedData = rc
+                .map((row: any) => {
+                    const student = students?.find((s: any) => s.id === row.student_id);
+                    if (student) {
+                        student.halaqah_data = halaqahs?.find((h: any) => h.id === student.halaqah_id);
+                    }
+                    return {
+                        ...row,
+                        students: student
+                    };
+                })
                 .filter((row: any) => {
                     const student = row.students;
                     if (!student?.is_active) return false;
@@ -152,10 +154,16 @@ export default function LegerNilai() {
                         settings ? {
                             bobot_akhlak: settings.bobot_akhlak,
                             bobot_kedisiplinan: settings.bobot_kedisiplinan,
-                            bobot_kognitif: settings.bobot_kognitif,
-                        } : null
+                            bobot_kognitif: settings.bobot_kognitif
+                        } : {
+                            bobot_akhlak: 1,
+                            bobot_kedisiplinan: 1,
+                            bobot_kognitif: 1
+                        }
                     )
                 }));
+
+            return formattedData;
         }
     });
 

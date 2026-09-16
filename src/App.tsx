@@ -26,30 +26,6 @@ import { Toaster } from './components/ui/toaster';
 const queryClient = new QueryClient();
 
 function App() {
-  const authMode = import.meta.env.VITE_AUTH_MODE || (import.meta.env.VITE_API_BASE_URL ? 'api' : 'local');
-  const isSupabaseMode = authMode === 'supabase';
-
-  if (isSupabaseMode) {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('your-project')) {
-      return (
-        <div className="flex h-screen items-center justify-center bg-red-50 p-4">
-          <div className="max-w-md text-center">
-            <h1 className="text-2xl font-bold text-red-600 mb-4">Konfigurasi Belum Lengkap</h1>
-            <p className="text-gray-700 mb-4">
-              File <code>.env</code> belum dikonfigurasi dengan benar untuk mode Supabase.
-            </p>
-            <p className="text-sm text-gray-500 bg-white p-4 rounded border text-left">
-              Silakan buka file <code>.env</code> dan isi <b>VITE_SUPABASE_URL</b> serta <b>VITE_SUPABASE_ANON_KEY</b>.
-            </p>
-          </div>
-        </div>
-      );
-    }
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

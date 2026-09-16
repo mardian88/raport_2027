@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -35,7 +35,7 @@ export default function TeacherManagement() {
     const { data: teachers, isLoading } = useQuery({
         queryKey: ['teachers_list'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('users')
                 .select('*')
                 .in('role', ['guru', 'admin'])
@@ -48,7 +48,7 @@ export default function TeacherManagement() {
     const updateMutation = useMutation({
         mutationFn: async (data: typeof formData) => {
             if (!editingUser) return;
-            const { error } = await supabase
+            const { error } = await db
                 .from('users')
                 .update(data)
                 .eq('id', editingUser.id);
@@ -90,7 +90,7 @@ export default function TeacherManagement() {
 
             // Bypass mode: insert directly into public.users with generated UUID
             const newId = crypto.randomUUID();
-            const { error } = await supabase.from('users').insert([{
+            const { error } = await db.from('users').insert([{
                 id: newId,
                 email: addFormData.email,
                 full_name: addFormData.full_name,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import type { SettingsLembaga } from '../../types';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -22,7 +22,7 @@ export default function Settings() {
     const { data: settings, isLoading } = useQuery({
         queryKey: ['settings'],
         queryFn: async () => {
-            const { data, error } = await supabase.from('settings_lembaga').select('*').single();
+            const { data, error } = await db.from('settings_lembaga').select('*').single();
             if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "no rows returned"
             return data as SettingsLembaga | null;
         },
@@ -38,13 +38,13 @@ export default function Settings() {
     const mutation = useMutation({
         mutationFn: async (newData: Partial<SettingsLembaga>) => {
             if (settings?.id) {
-                const { error } = await supabase
+                const { error } = await db
                     .from('settings_lembaga')
                     .update(newData)
                     .eq('id', settings.id);
                 if (error) throw error;
             } else {
-                const { error } = await supabase
+                const { error } = await db
                     .from('settings_lembaga')
                     .insert([newData]);
                 if (error) throw error;

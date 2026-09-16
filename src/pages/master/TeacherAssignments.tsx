@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
@@ -27,7 +27,7 @@ export default function TeacherAssignments() {
     const { data: assignments, isLoading } = useQuery({
         queryKey: ['teacher_assignments'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('teacher_assignments')
                 .select(`
                     *,
@@ -45,7 +45,7 @@ export default function TeacherAssignments() {
     const { data: teachers } = useQuery({
         queryKey: ['teachers_list'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('users')
                 .select('*')
                 .in('role', ['guru', 'admin'])
@@ -59,7 +59,7 @@ export default function TeacherAssignments() {
     const { data: halaqahList } = useQuery({
         queryKey: ['halaqah'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('halaqah')
                 .select('*')
                 .eq('is_active', true)
@@ -73,13 +73,13 @@ export default function TeacherAssignments() {
     const mutation = useMutation({
         mutationFn: async (data: typeof formData) => {
             if (editingId) {
-                const { error } = await supabase
+                const { error } = await db
                     .from('teacher_assignments')
                     .update(data)
                     .eq('id', editingId);
                 if (error) throw error;
             } else {
-                const { error } = await supabase
+                const { error } = await db
                     .from('teacher_assignments')
                     .insert([data]);
                 if (error) throw error;
@@ -108,7 +108,7 @@ export default function TeacherAssignments() {
     // Delete assignment mutation
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await supabase
+            const { error } = await db
                 .from('teacher_assignments')
                 .delete()
                 .eq('id', id);

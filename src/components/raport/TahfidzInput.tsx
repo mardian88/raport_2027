@@ -1,6 +1,6 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import type { SurahMaster, TahfidzProgress } from '../../types';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -34,17 +34,25 @@ export function TahfidzInput({ reportCardId, studentId, onScoreChange, onProgres
             if (!studentId) return [];
 
             // Fetch surah that are assigned and active for this student
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('student_surah_assignment')
-                .select('surah_id, surah:surah_master(*)')
+                .select('*')
                 .eq('student_id', studentId)
                 .eq('is_active', true);
 
             if (error) throw error;
+            if (!data || data.length === 0) return [];
+            
+            // Fetch surah metadata
+            const surahIds = data.map((d: any) => d.surah_id);
+            const { data: surahs } = await db.from('surah_master').select('*').in('id', surahIds);
 
             // Extract surah data and sort
             const surahList = (data || [])
-                .map((item: any) => item.surah as SurahMaster)
+                .map((item: any) => {
+                    const surahData = surahs?.find((s: any) => s.id === item.surah_id);
+                    return surahData as SurahMaster;
+                })
                 .filter((s): s is SurahMaster => s !== null && s !== undefined)
                 .sort((a, b) => {
                     if (a.juz !== b.juz) return b.juz - a.juz; // Descending Juz
@@ -60,9 +68,9 @@ export function TahfidzInput({ reportCardId, studentId, onScoreChange, onProgres
         queryKey: ['tahfidz_progress', reportCardId],
         enabled: !!reportCardId,
         queryFn: async () => {
-            const { data } = await supabase
+            const { data } = await db
                 .from('tahfidz_progress')
-                .select('*, surah:surah_master(*)')
+                .select('*')
                 .eq('report_card_id', reportCardId!);
             return data as TahfidzProgress[];
         }
@@ -146,7 +154,7 @@ export function TahfidzInput({ reportCardId, studentId, onScoreChange, onProgres
     // Mutation to update Surah name
     const updateSurahMutation = useMutation({
         mutationFn: async ({ id, name }: { id: string; name: string }) => {
-            const { error } = await supabase
+            const { error } = await db
                 .from('surah_master')
                 .update({ nama_surah: name })
                 .eq('id', id);

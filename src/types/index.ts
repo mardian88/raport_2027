@@ -104,6 +104,7 @@ export interface SurahMaster {
     id: string;
     juz: number;
     nama_surah: string;
+    nama_arab?: string;
     nomor_surah: number;
     urutan_dalam_juz: number;
     is_active: boolean;

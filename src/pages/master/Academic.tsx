@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import type { AcademicYear, Semester } from '../../types';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -16,7 +16,7 @@ export default function Academic() {
     const { data: academicYears, isLoading } = useQuery({
         queryKey: ['academic_years'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('academic_years')
                 .select('*, semesters(*)')
                 .order('created_at', { ascending: false });
@@ -32,7 +32,7 @@ export default function Academic() {
 
     const addYearMutation = useMutation({
         mutationFn: async (tahun_ajaran: string) => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('academic_years')
                 .insert([{ tahun_ajaran, is_active: false }])
                 .select()
@@ -41,7 +41,7 @@ export default function Academic() {
 
             // Auto create Ganjil & Genap semesters
             if (data) {
-                await supabase.from('semesters').insert([
+                await db.from('semesters').insert([
                     { academic_year_id: data.id, nama: 'Ganjil', is_active: false },
                     { academic_year_id: data.id, nama: 'Genap', is_active: false },
                 ]);
@@ -56,12 +56,12 @@ export default function Academic() {
     const activateSemesterMutation = useMutation({
         mutationFn: async ({ semesterId, yearId }: { semesterId: string, yearId: string }) => {
             // Deactivate all
-            await supabase.from('semesters').update({ is_active: false }).neq('id', '00000000-0000-0000-0000-000000000000');
-            await supabase.from('academic_years').update({ is_active: false }).neq('id', '00000000-0000-0000-0000-000000000000');
+            await db.from('semesters').update({ is_active: false }).neq('id', '00000000-0000-0000-0000-000000000000');
+            await db.from('academic_years').update({ is_active: false }).neq('id', '00000000-0000-0000-0000-000000000000');
 
             // Activate target
-            await supabase.from('academic_years').update({ is_active: true }).eq('id', yearId);
-            await supabase.from('semesters').update({ is_active: true }).eq('id', semesterId);
+            await db.from('academic_years').update({ is_active: true }).eq('id', yearId);
+            await db.from('semesters').update({ is_active: true }).eq('id', semesterId);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['academic_years'] });
@@ -70,7 +70,7 @@ export default function Academic() {
 
     const deleteYearMutation = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await supabase.from('academic_years').delete().eq('id', id);
+            const { error } = await db.from('academic_years').delete().eq('id', id);
             if (error) throw error;
         },
         onSuccess: () => {

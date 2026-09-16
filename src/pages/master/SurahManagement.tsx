@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import type { SurahMaster } from '../../types';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -9,10 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Plus, Pencil, Trash2, Eye, EyeOff, Check, X, Settings } from 'lucide-react';
 import { useToast } from '../../components/ui/use-toast';
 import { showAlert } from '../../utils/sweetAlert';
+import { QURAN_SURAHS } from '../../data/quran';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function SurahManagement() {
     const queryClient = useQueryClient();
     const { toast } = useToast();
+    const { session } = useAuth();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingSurah, setEditingSurah] = useState<SurahMaster | null>(null);
     const [formData, setFormData] = useState<Partial<SurahMaster>>({});
@@ -24,7 +27,7 @@ export default function SurahManagement() {
     const { data: surahList, isLoading } = useQuery({
         queryKey: ['surah_master'],
         queryFn: async () => {
-            const { data } = await supabase
+            const { data } = await db
                 .from('surah_master')
                 .select('*')
                 .order('juz', { ascending: false })
@@ -36,13 +39,13 @@ export default function SurahManagement() {
     const saveMutation = useMutation({
         mutationFn: async (data: Partial<SurahMaster>) => {
             if (data.id) {
-                const { error } = await supabase
+                const { error } = await db
                     .from('surah_master')
                     .update(data)
                     .eq('id', data.id);
                 if (error) throw error;
             } else {
-                const { error } = await supabase.from('surah_master').insert([data]);
+                const { error } = await db.from('surah_master').insert([data]);
                 if (error) throw error;
             }
         },
@@ -68,9 +71,44 @@ export default function SurahManagement() {
         }
     });
 
+    const seedMutation = useMutation({
+        mutationFn: async () => {
+            // Kita hapus semua surah yang ada dulu atau insert only jika kosong
+            const { count } = await db.from('surah_master').select('*', { count: 'exact', head: true });
+            if (count && count > 0) {
+                if (!await showAlert.confirm('Database surah sudah terisi. Yakin ingin menghapus semua dan generate ulang 114 Surah?')) {
+                    throw new Error('Cancelled');
+                }
+                await db.from('surah_master').delete().neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+            }
+            
+            // Insert in batches of 30 due to potential limits
+            const dataToInsert = QURAN_SURAHS.map(s => ({
+                juz: s.juz,
+                nomor_surah: s.nomor_surah,
+                nama_surah: s.nama_surah,
+                nama_arab: s.nama_arab,
+                urutan_dalam_juz: s.urutan_dalam_juz,
+                is_active: true
+            }));
+
+            const { error } = await db.from('surah_master').insert(dataToInsert);
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['surah_master'] });
+            toast({ title: 'Berhasil', description: '114 Surah resmi berhasil digenerate', variant: 'success' });
+        },
+        onError: (err: any) => {
+            if (err.message !== 'Cancelled') {
+                toast({ title: 'Gagal', description: 'Gagal generate surah: ' + err.message, variant: 'destructive' });
+            }
+        }
+    });
+
     const toggleActiveMutation = useMutation({
         mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-            const { error } = await supabase
+            const { error } = await db
                 .from('surah_master')
                 .update({ is_active: !isActive })
                 .eq('id', id);
@@ -83,7 +121,7 @@ export default function SurahManagement() {
 
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await supabase.from('surah_master').delete().eq('id', id);
+            const { error } = await db.from('surah_master').delete().eq('id', id);
             if (error) throw error;
         },
         onSuccess: () => {
@@ -137,11 +175,24 @@ export default function SurahManagement() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold">Manajemen Surah</h1>
-                <Button onClick={() => { setEditingSurah(null); setFormData({}); setIsFormOpen(true); }}>
-                    <Plus className="mr-2 h-4 w-4" /> Tambah Surah
-                </Button>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold">Manajemen Surah</h1>
+                    <p className="text-sm text-gray-500 mt-1">Kelola surah dan juz yang tersedia di sistem</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    <Button 
+                        variant="outline" 
+                        onClick={() => seedMutation.mutate()} 
+                        disabled={seedMutation.isPending}
+                        className="min-h-[44px] border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                    >
+                        {seedMutation.isPending ? 'Generating...' : 'Generate 114 Surah Resmi'}
+                    </Button>
+                    <Button onClick={() => { setEditingSurah(null); setFormData({}); setIsFormOpen(true); }} className="min-h-[44px]">
+                        <Plus className="mr-2 h-4 w-4" /> Tambah Surah Manual
+                    </Button>
+                </div>
             </div>
 
             {isFormOpen && (
@@ -214,8 +265,8 @@ export default function SurahManagement() {
                             <CardContent>
                                 <div className="space-y-2">
                                     {surahList.map((surah) => (
-                                        <div key={surah.id} className="flex justify-between items-center py-2 border-b last:border-0">
-                                            <div className="flex items-center gap-3 flex-1">
+                                        <div key={surah.id} className="flex flex-col sm:flex-row justify-between sm:items-center py-3 border-b last:border-0 gap-2">
+                                            <div className="flex items-start sm:items-center gap-3 flex-1">
                                                 {inlineEditingId === surah.id ? (
                                                     <div className="flex items-center gap-2 flex-1 max-w-md">
                                                         <Input
@@ -236,42 +287,52 @@ export default function SurahManagement() {
                                                         </Button>
                                                     </div>
                                                 ) : (
-                                                    <span className={`text-sm ${!surah.is_active ? 'text-gray-400 line-through' : ''}`}>
-                                                        {surah.nama_surah} ({surah.nomor_surah})
-                                                    </span>
+                                                    <div className={`flex flex-col ${!surah.is_active ? 'opacity-50' : ''}`}>
+                                                        <span className={`text-base font-medium ${!surah.is_active ? 'line-through' : 'text-gray-900'}`}>
+                                                            {surah.nomor_surah}. {surah.nama_surah}
+                                                        </span>
+                                                        {surah.nama_arab && (
+                                                            <span className="text-xl font-arabic text-emerald-800 mt-1" dir="rtl">
+                                                                {surah.nama_arab}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 )}
 
                                                 {!surah.is_active && (
-                                                    <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">Nonaktif</span>
+                                                    <span className="text-xs bg-gray-200 px-2 py-0.5 rounded ml-2">Nonaktif</span>
                                                 )}
                                             </div>
-                                            <div className="flex gap-1">
+                                            <div className="flex flex-wrap gap-1 mt-2 sm:mt-0 justify-end">
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
+                                                    className="h-10 w-10 p-0"
                                                     onClick={() => toggleActiveMutation.mutate({ id: surah.id, isActive: surah.is_active })}
                                                     title={surah.is_active ? 'Nonaktifkan' : 'Aktifkan'}
                                                 >
-                                                    {surah.is_active ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                                                    {surah.is_active ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
                                                 </Button>
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
+                                                    className="h-10 w-10 p-0"
                                                     onClick={() => handleInlineEdit(surah)}
                                                     title="Edit Nama"
                                                 >
-                                                    <Pencil className="h-4 w-4" />
+                                                    <Pencil className="h-5 w-5" />
                                                 </Button>
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
+                                                    className="h-10 w-10 p-0"
                                                     onClick={() => handleFullEdit(surah)}
                                                     title="Edit Detail Lengkap"
                                                 >
-                                                    <Settings className="h-4 w-4" />
+                                                    <Settings className="h-5 w-5" />
                                                 </Button>
-                                                <Button size="sm" variant="ghost" className="text-red-500" onClick={() => handleDelete(surah.id)}>
-                                                    <Trash2 className="h-4 w-4" />
+                                                <Button size="sm" variant="ghost" className="text-red-500 h-10 w-10 p-0 hover:bg-red-50" onClick={() => handleDelete(surah.id)}>
+                                                    <Trash2 className="h-5 w-5" />
                                                 </Button>
                                             </div>
                                         </div>

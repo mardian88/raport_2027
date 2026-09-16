@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import {
     LayoutDashboard,
     Users,
@@ -45,7 +45,7 @@ export default function Layout() {
             if (session?.user?.id === 'bypass-admin-local') {
                 return 'admin' as const;
             }
-            const { data } = await supabase
+            const { data } = await db
                 .from('users')
                 .select('role')
                 .eq('id', session!.user!.id)

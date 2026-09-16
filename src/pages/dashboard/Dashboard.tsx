@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import { Card, CardContent } from '../../components/ui/card';
 import {
     Users,
@@ -28,10 +28,10 @@ export default function Dashboard() {
 
             // Admin / general metrics
             const [studentsRes, reportsRes, halaqahRes, semesterRes] = await Promise.all([
-                supabase.from('students').select('*', { count: 'exact', head: true }).eq('is_active', true),
-                supabase.from('report_cards').select('*', { count: 'exact', head: true }),
-                supabase.from('halaqah').select('*', { count: 'exact', head: true }).eq('is_active', true),
-                supabase.from('semesters').select('*, academic_years(tahun)').eq('is_active', true).maybeSingle(),
+                db.from('students').select('*', { count: 'exact', head: true }).eq('is_active', true),
+                db.from('report_cards').select('*', { count: 'exact', head: true }),
+                db.from('halaqah').select('*', { count: 'exact', head: true }).eq('is_active', true),
+                db.from('semesters').select('*, academic_years(tahun)').eq('is_active', true).maybeSingle(),
             ]);
 
             return {
@@ -51,7 +51,7 @@ export default function Dashboard() {
             if (session?.user?.id === 'bypass-admin-local') {
                 return 'admin' as const;
             }
-            const { data } = await supabase
+            const { data } = await db
                 .from('users')
                 .select('role')
                 .eq('id', session!.user!.id)

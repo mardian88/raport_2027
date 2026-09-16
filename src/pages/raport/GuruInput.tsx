@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import type { Student, ReportCard, Semester, TeacherAssignment } from '../../types';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -40,7 +40,7 @@ export default function GuruInput() {
     const { data: activeSemesterData } = useQuery({
         queryKey: ['active_semester'],
         queryFn: async () => {
-            const { data } = await supabase
+            const { data } = await db
                 .from('semesters')
                 .select('*, academic_year:academic_years(*)')
                 .eq('is_active', true)
@@ -58,7 +58,7 @@ export default function GuruInput() {
         queryKey: ['teacher_assignments', session?.user?.id],
         enabled: !!session?.user?.id,
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('teacher_assignments')
                 .select(`
                     *,
@@ -86,7 +86,7 @@ export default function GuruInput() {
         queryKey: ['students', selectedHalaqahId],
         enabled: !!selectedHalaqahId,
         queryFn: async () => {
-            const { data } = await supabase
+            const { data } = await db
                 .from('students')
                 .select('*, halaqah_data:halaqah(*)')
                 .eq('halaqah_id', selectedHalaqahId)
@@ -100,7 +100,7 @@ export default function GuruInput() {
     const { data: globalTahsinItems } = useQuery({
         queryKey: ['tahsin_master_global'],
         queryFn: async () => {
-            const { data } = await supabase
+            const { data } = await db
                 .from('tahsin_master')
                 .select('nama_item')
                 .eq('is_active', true)
@@ -113,7 +113,7 @@ export default function GuruInput() {
     const { data: settings } = useQuery({
         queryKey: ['settings'],
         queryFn: async () => {
-            const { data } = await supabase.from('settings_lembaga').select('*').single();
+            const { data } = await db.from('settings_lembaga').select('*').single();
             return data;
         }
     });
@@ -123,7 +123,7 @@ export default function GuruInput() {
         queryKey: ['report_card', selectedStudentId, activeSemester?.id],
         enabled: !!selectedStudentId && !!activeSemester?.id,
         queryFn: async () => {
-            const { data } = await supabase
+            const { data } = await db
                 .from('report_cards')
                 .select('*')
                 .eq('student_id', selectedStudentId)
@@ -138,7 +138,7 @@ export default function GuruInput() {
         queryKey: ['tahfidz_avg', existingReport?.id],
         enabled: !!existingReport?.id,
         queryFn: async () => {
-            const { data } = await supabase
+            const { data } = await db
                 .from('tahfidz_progress')
                 .select('kb, kh')
                 .eq('report_card_id', existingReport!.id);
@@ -192,7 +192,7 @@ export default function GuruInput() {
         enabled: !!searchParams.get('student'),
         queryFn: async () => {
             const id = searchParams.get('student');
-            const { data } = await supabase.from('students').select('halaqah_id').eq('id', id!).single();
+            const { data } = await db.from('students').select('halaqah_id').eq('id', id!).single();
             return data;
         }
     });
@@ -528,7 +528,7 @@ export default function GuruInput() {
             if (!selectedStudentId || !activeSemester || !selectedSubject) return;
 
             // Fetch existing report to preserve other fields
-            const { data: currentReport } = await supabase
+            const { data: currentReport } = await db
                 .from('report_cards')
                 .select('*')
                 .eq('student_id', selectedStudentId)
@@ -609,9 +609,9 @@ export default function GuruInput() {
             let reportId = existingReport?.id;
 
             if (reportId) {
-                await supabase.from('report_cards').update(payload).eq('id', reportId);
+                await db.from('report_cards').update(payload).eq('id', reportId);
             } else {
-                const { data, error } = await supabase.from('report_cards').insert([payload]).select().single();
+                const { data, error } = await db.from('report_cards').insert([payload]).select().single();
                 if (error) throw error;
                 reportId = data.id;
             }
@@ -620,12 +620,14 @@ export default function GuruInput() {
             if (isTahfidz && reportId && Object.keys(tahfidzProgress).length > 0) {
                 const progressRecords = Object.entries(tahfidzProgress).map(([surahId, scores]) => ({
                     report_card_id: reportId,
+                    student_id: selectedStudentId,
+                    semester_id: activeSemester.id,
                     surah_id: surahId,
                     kb: scores.kb,
                     kh: scores.kh
                 }));
 
-                const { error: progressError } = await supabase
+                const { error: progressError } = await db
                     .from('tahfidz_progress')
                     .upsert(progressRecords, { onConflict: 'report_card_id,surah_id' });
 

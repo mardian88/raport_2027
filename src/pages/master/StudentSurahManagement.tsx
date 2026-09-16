@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { BookOpen, Loader2 } from 'lucide-react';
@@ -35,7 +35,7 @@ export default function StudentSurahManagement() {
         queryKey: ['teacher_assignments', session?.user?.id],
         enabled: !!session?.user?.id,
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('teacher_assignments')
                 .select('*')
                 .eq('teacher_id', session!.user!.id)
@@ -52,7 +52,7 @@ export default function StudentSurahManagement() {
     const { data: students } = useQuery({
         queryKey: ['students', assignedHalaqahIds],
         queryFn: async () => {
-            let query = supabase
+            let query = db
                 .from('students')
                 .select('*')
                 .eq('is_active', true);
@@ -72,7 +72,7 @@ export default function StudentSurahManagement() {
     const { data: halaqahList } = useQuery({
         queryKey: ['halaqah', assignedHalaqahIds],
         queryFn: async () => {
-            let query = supabase
+            let query = db
                 .from('halaqah')
                 .select('*')
                 .eq('is_active', true);
@@ -92,7 +92,7 @@ export default function StudentSurahManagement() {
     const { data: allSurah } = useQuery({
         queryKey: ['surah_master'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('surah_master')
                 .select('*')
                 .eq('is_active', true)
@@ -107,7 +107,7 @@ export default function StudentSurahManagement() {
         queryKey: ['student_surah_assignment', selectedStudent],
         queryFn: async () => {
             if (!selectedStudent) return [];
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('student_surah_assignment')
                 .select('*')
                 .eq('student_id', selectedStudent);
@@ -117,6 +117,39 @@ export default function StudentSurahManagement() {
         enabled: !!selectedStudent && activeTab === 'santri'
     });
 
+    // Fetch halaqah active surahs to initialize checkboxes
+    const { data: halaqahActiveSurahs } = useQuery({
+        queryKey: ['halaqah_active_surahs', selectedHalaqah],
+        queryFn: async () => {
+            if (!selectedHalaqah) return [];
+            
+            // Get all students in this halaqah
+            const { data: students } = await db.from('students').select('id').eq('halaqah_id', selectedHalaqah).eq('is_active', true);
+            if (!students || students.length === 0) return [];
+            const studentIds = students.map(s => s.id);
+            
+            // Get assignments for these students
+            const { data: assignments } = await db.from('student_surah_assignment')
+                .select('surah_id, is_active')
+                .in('student_id', studentIds);
+                
+            // Consider a surah "active" in halaqah if it is active for AT LEAST ONE student
+            const activeSet = new Set<string>();
+            assignments?.forEach((a: any) => {
+                if (a.is_active) activeSet.add(a.surah_id);
+            });
+            
+            return Array.from(activeSet);
+        },
+        enabled: !!selectedHalaqah && activeTab === 'halaqah'
+    });
+
+    useEffect(() => {
+        if (activeTab === 'halaqah' && halaqahActiveSurahs) {
+            setSelectedSurahs(new Set(halaqahActiveSurahs));
+        }
+    }, [halaqahActiveSurahs, activeTab]);
+
     // Toggle individual surah (Per Santri)
     const toggleSurahMutation = useMutation({
         mutationFn: async ({ surahId, isActive }: { surahId: string; isActive: boolean }) => {
@@ -124,7 +157,7 @@ export default function StudentSurahManagement() {
 
             if (isActive) {
                 // Activate surah
-                const { error } = await supabase
+                const { error } = await db
                     .from('student_surah_assignment')
                     .upsert({
                         student_id: selectedStudent,
@@ -135,7 +168,7 @@ export default function StudentSurahManagement() {
                 if (error) throw error;
             } else {
                 // Deactivate surah
-                const { error } = await supabase
+                const { error } = await db
                     .from('student_surah_assignment')
                     .update({ is_active: false })
                     .eq('student_id', selectedStudent)
@@ -162,21 +195,36 @@ export default function StudentSurahManagement() {
         mutationFn: async ({ juz, assign }: { juz: number; assign: boolean }) => {
             if (!selectedStudent) return;
 
-            const { error } = await supabase.rpc(
-                assign ? 'assign_juz_to_student' : 'unassign_juz_from_student',
-                {
-                    p_student_id: selectedStudent,
-                    p_juz: juz
-                }
-            );
-            if (error) throw error;
+            const juzSurahs = allSurah?.filter(s => s.juz === juz) || [];
+            if (juzSurahs.length === 0) return;
+
+            if (assign) {
+                const upsertData = juzSurahs.map(s => ({
+                    student_id: selectedStudent,
+                    surah_id: s.id,
+                    is_active: true
+                }));
+                const { error } = await db
+                    .from('student_surah_assignment')
+                    .upsert(upsertData, { onConflict: 'student_id, surah_id' });
+                if (error) throw error;
+            } else {
+                const surahIds = juzSurahs.map(s => s.id);
+                const { error } = await db
+                    .from('student_surah_assignment')
+                    .update({ is_active: false })
+                    .eq('student_id', selectedStudent)
+                    .in('surah_id', surahIds);
+                if (error) throw error;
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['student_surah_assignment', selectedStudent] });
             toast({
                 variant: "success",
                 title: "Berhasil",
-                description: "Juz berhasil diupdate."
+                description: "Juz berhasil diupdate.",
+                duration: 500
             });
         },
         onError: (error) => {
@@ -195,7 +243,7 @@ export default function StudentSurahManagement() {
             if (!selectedHalaqah) return;
 
             // 1. Get all students in this halaqah
-            const { data: studentsInHalaqah, error: studentError } = await supabase
+            const { data: studentsInHalaqah, error: studentError } = await db
                 .from('students')
                 .select('id')
                 .eq('halaqah_id', selectedHalaqah)
@@ -222,8 +270,8 @@ export default function StudentSurahManagement() {
                 }
 
                 // Batch upsert might be too large, but let's try. 
-                // Supabase handles reasonably large batches.
-                const { error } = await supabase
+                // db handles reasonably large batches.
+                const { error } = await db
                     .from('student_surah_assignment')
                     .upsert(upsertData, { onConflict: 'student_id, surah_id' });
 
@@ -231,7 +279,7 @@ export default function StudentSurahManagement() {
 
             } else {
                 // Deactivate
-                const { error } = await supabase
+                const { error } = await db
                     .from('student_surah_assignment')
                     .update({ is_active: false })
                     .in('student_id', studentIds)
@@ -241,12 +289,14 @@ export default function StudentSurahManagement() {
             }
         },
         onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['student_surah_assignment'] });
+            queryClient.invalidateQueries({ queryKey: ['halaqah_active_surahs'] });
             toast({
                 variant: "success",
                 title: "Berhasil",
-                description: `${variables.surahIds.length} surah berhasil ${variables.isActive ? 'diaktifkan' : 'dinonaktifkan'} untuk semua santri di halaqah ini.`
+                description: `${variables.surahIds.length} surah berhasil ${variables.isActive ? 'diaktifkan' : 'dinonaktifkan'} untuk semua santri di halaqah ini.`,
+                duration: 500
             });
-            setSelectedSurahs(new Set()); // Reset selection
         },
         onError: (error) => {
             console.error('Bulk Halaqah mutation error:', error);
@@ -270,19 +320,6 @@ export default function StudentSurahManagement() {
         }
     };
 
-    const handleHalaqahBulkAction = (isActive: boolean) => {
-        if (selectedSurahs.size === 0) return;
-
-        const actionText = isActive ? 'mengaktifkan' : 'menonaktifkan';
-        setConfirmTitle(`Konfirmasi ${isActive ? 'Aktifkan' : 'Nonaktifkan'} Massal`);
-        setConfirmDesc(`Apakah Anda yakin ingin ${actionText} ${selectedSurahs.size} surah terpilih untuk SEMUA santri di halaqah ini?`);
-        setConfirmAction(() => () => bulkHalaqahMutation.mutate({
-            surahIds: Array.from(selectedSurahs),
-            isActive
-        }));
-        setConfirmOpen(true);
-    };
-
     const isSurahActive = (surahId: string) => {
         return assignedSurah?.some(a => a.surah_id === surahId && a.is_active) || false;
     };
@@ -293,26 +330,33 @@ export default function StudentSurahManagement() {
     };
 
     const toggleSurahSelection = (surahId: string) => {
+        const isActive = !selectedSurahs.has(surahId);
+        
+        // Optimistic update
         const newSet = new Set(selectedSurahs);
-        if (newSet.has(surahId)) {
-            newSet.delete(surahId);
-        } else {
-            newSet.add(surahId);
-        }
+        if (isActive) newSet.add(surahId);
+        else newSet.delete(surahId);
         setSelectedSurahs(newSet);
+
+        // Mutate
+        bulkHalaqahMutation.mutate({ surahIds: [surahId], isActive });
     };
 
     const toggleJuzSelection = (juz: number) => {
         const juzSurahs = groupedByJuz?.[juz] || [];
-        const allSelected = juzSurahs.every(s => selectedSurahs.has(s.id));
+        const isActive = !juzSurahs.every(s => selectedSurahs.has(s.id));
+        
+        // Optimistic update
         const newSet = new Set(selectedSurahs);
-
-        if (allSelected) {
-            juzSurahs.forEach(s => newSet.delete(s.id));
-        } else {
+        if (isActive) {
             juzSurahs.forEach(s => newSet.add(s.id));
+        } else {
+            juzSurahs.forEach(s => newSet.delete(s.id));
         }
         setSelectedSurahs(newSet);
+
+        // Mutate
+        bulkHalaqahMutation.mutate({ surahIds: juzSurahs.map(s => s.id), isActive });
     };
 
     const groupedByJuz = allSurah?.reduce((acc, surah) => {
@@ -413,7 +457,7 @@ export default function StudentSurahManagement() {
                                     </div>
                                 ) : (
                                     <div className="space-y-6">
-                                        {[27, 28, 29, 30].map((juz) => (
+                                        {Object.keys(groupedByJuz || {}).map(Number).sort((a,b) => b - a).map((juz) => (
                                             <div key={juz} className="border rounded-lg p-4">
                                                 <div className="flex items-center justify-between mb-3">
                                                     <h3 className="font-semibold text-lg">Juz {juz}</h3>
@@ -439,7 +483,7 @@ export default function StudentSurahManagement() {
                                                 </div>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                                     {groupedByJuz?.[juz]?.map((surah) => (
-                                                        <div key={surah.id} className="flex items-center space-x-2 p-2 border rounded hover:bg-gray-50">
+                                                        <div key={surah.id} className="flex items-center space-x-3 p-3 border rounded-xl hover:bg-gray-50 bg-white">
                                                             <input
                                                                 type="checkbox"
                                                                 id={surah.id}
@@ -450,13 +494,16 @@ export default function StudentSurahManagement() {
                                                                         isActive: e.target.checked
                                                                     });
                                                                 }}
-                                                                className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                                                className="h-5 w-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 min-w-[20px]"
                                                             />
                                                             <label
                                                                 htmlFor={surah.id}
-                                                                className="text-sm cursor-pointer flex-1"
+                                                                className="cursor-pointer flex-1 flex flex-col min-w-0"
                                                             >
-                                                                {surah.nomor_surah}. {surah.nama_surah}
+                                                                <span className="text-sm font-semibold">{surah.nomor_surah}. {surah.nama_surah}</span>
+                                                                {surah.nama_arab && (
+                                                                    <span className="text-lg font-arabic text-emerald-800" dir="rtl">{surah.nama_arab}</span>
+                                                                )}
                                                             </label>
                                                         </div>
                                                     ))}
@@ -500,41 +547,30 @@ export default function StudentSurahManagement() {
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle>Pilih Surah untuk Aksi Massal</CardTitle>
-                                <div className="flex gap-2">
-                                    <Button
-                                        size="sm"
-                                        onClick={() => handleHalaqahBulkAction(true)}
-                                        disabled={selectedSurahs.size === 0 || bulkHalaqahMutation.isPending}
-                                    >
-                                        Aktifkan ({selectedSurahs.size})
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        onClick={() => handleHalaqahBulkAction(false)}
-                                        disabled={selectedSurahs.size === 0 || bulkHalaqahMutation.isPending}
-                                    >
-                                        Nonaktifkan ({selectedSurahs.size})
-                                    </Button>
-                                </div>
+                                {bulkHalaqahMutation.isPending && (
+                                    <div className="flex items-center text-sm text-emerald-600 gap-2">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Menyimpan...
+                                    </div>
+                                )}
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-6">
-                                    {[27, 28, 29, 30].map((juz) => (
+                                    {Object.keys(groupedByJuz || {}).map(Number).sort((a,b) => b - a).map((juz) => (
                                         <div key={juz} className="border rounded-lg p-4">
                                             <div className="flex items-center justify-between mb-3">
                                                 <h3 className="font-semibold text-lg">Juz {juz}</h3>
-                                                <div className="flex items-center space-x-2">
+                                                <div className="flex items-center space-x-3 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
                                                     <input
                                                         type="checkbox"
                                                         id={`select-all-juz-${juz}`}
                                                         checked={groupedByJuz?.[juz]?.every(s => selectedSurahs.has(s.id)) || false}
                                                         onChange={() => toggleJuzSelection(juz)}
-                                                        className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                                        className="h-5 w-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                                                     />
                                                     <label
                                                         htmlFor={`select-all-juz-${juz}`}
-                                                        className="text-sm cursor-pointer text-gray-600"
+                                                        className="text-sm font-medium cursor-pointer text-gray-700"
                                                     >
                                                         Pilih Semua Juz {juz}
                                                     </label>
@@ -542,19 +578,22 @@ export default function StudentSurahManagement() {
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                                 {groupedByJuz?.[juz]?.map((surah) => (
-                                                    <div key={surah.id} className={`flex items-center space-x-2 p-2 border rounded hover:bg-gray-50 ${selectedSurahs.has(surah.id) ? 'bg-blue-50 border-blue-200' : ''}`}>
+                                                    <div key={surah.id} className={`flex items-center space-x-3 p-3 border rounded-xl hover:bg-gray-50 bg-white ${selectedSurahs.has(surah.id) ? 'bg-blue-50/50 border-blue-200' : ''}`}>
                                                         <input
                                                             type="checkbox"
                                                             id={`bulk-${surah.id}`}
                                                             checked={selectedSurahs.has(surah.id)}
                                                             onChange={() => toggleSurahSelection(surah.id)}
-                                                            className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                                            className="h-5 w-5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 min-w-[20px]"
                                                         />
                                                         <label
                                                             htmlFor={`bulk-${surah.id}`}
-                                                            className="text-sm cursor-pointer flex-1"
+                                                            className="cursor-pointer flex-1 flex flex-col min-w-0"
                                                         >
-                                                            {surah.nomor_surah}. {surah.nama_surah}
+                                                            <span className="text-sm font-semibold">{surah.nomor_surah}. {surah.nama_surah}</span>
+                                                            {surah.nama_arab && (
+                                                                <span className="text-lg font-arabic text-emerald-800" dir="rtl">{surah.nama_arab}</span>
+                                                            )}
                                                         </label>
                                                     </div>
                                                 ))}

@@ -421,6 +421,21 @@ class TursoDeleteBuilder {
         return this;
     }
 
+    neq(field: string, value: any) {
+        this.filters.push({ field, op: 'neq', value });
+        return this;
+    }
+
+    gt(field: string, value: any) {
+        this.filters.push({ field, op: 'gt', value });
+        return this;
+    }
+
+    gte(field: string, value: any) {
+        this.filters.push({ field, op: 'gte', value });
+        return this;
+    }
+
     in(field: string, values: any[]) {
         this.filters.push({ field, op: 'in', value: values });
         return this;
@@ -441,6 +456,15 @@ class TursoDeleteBuilder {
 
                 if (f.op === 'eq') {
                     whereClauses.push(f.field + ' = ?');
+                    args.push(colVal);
+                } else if (f.op === 'neq') {
+                    whereClauses.push(f.field + ' != ?');
+                    args.push(colVal);
+                } else if (f.op === 'gt') {
+                    whereClauses.push(f.field + ' > ?');
+                    args.push(colVal);
+                } else if (f.op === 'gte') {
+                    whereClauses.push(f.field + ' >= ?');
                     args.push(colVal);
                 } else if (f.op === 'in') {
                     if (Array.isArray(colVal) && colVal.length > 0) {
@@ -489,6 +513,7 @@ class TursoUpsertBuilder {
 
             const rawList = Array.isArray(this.rows) ? this.rows : [this.rows];
             const results: any[] = [];
+            const statements: { sql: string; args: any[] }[] = [];
 
             for (const item of rawList) {
                 const row = { ...item };
@@ -510,8 +535,13 @@ class TursoUpsertBuilder {
                 }
 
                 const sql = 'INSERT OR REPLACE INTO ' + realTable + ' (' + cols.join(', ') + ') VALUES (' + placeholders.join(', ') + ')';
-                await tursoDb.execute({ sql, args });
+                statements.push({ sql, args });
                 results.push(formatRow(row, realTable));
+            }
+
+            if (statements.length > 0) {
+                // Gunakan batch untuk eksekusi yang jauh lebih cepat dalam 1 network request
+                await tursoDb.batch(statements, 'write');
             }
 
             return { data: Array.isArray(this.rows) ? results : results[0], error: null };
@@ -535,7 +565,7 @@ function notifyAuth(event: string, session: any) {
     });
 }
 
-export const tursoClient = {
+export const tursoClient: any = {
     from(tableName: string) {
         return {
             select(fields = '*', options?: { count?: 'exact'; head?: boolean }) {

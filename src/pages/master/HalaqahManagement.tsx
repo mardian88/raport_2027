@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '../../lib/utils';
 import { showAlert } from '../../utils/sweetAlert';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent } from '../../components/ui/card';
@@ -29,7 +29,7 @@ export default function HalaqahManagement() {
     const { data: halaqahList, isLoading } = useQuery({
         queryKey: ['halaqah'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('halaqah')
                 .select('*, guru:users(id, email, full_name)')
                 .order('nama');
@@ -42,7 +42,7 @@ export default function HalaqahManagement() {
     const { data: teachers } = useQuery({
         queryKey: ['teachers'],
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('users')
                 .select('*')
                 .in('role', ['guru', 'admin'])
@@ -55,13 +55,13 @@ export default function HalaqahManagement() {
     const mutation = useMutation({
         mutationFn: async (data: typeof formData) => {
             if (editingId) {
-                const { error } = await supabase
+                const { error } = await db
                     .from('halaqah')
                     .update(data)
                     .eq('id', editingId);
                 if (error) throw error;
             } else {
-                const { error } = await supabase
+                const { error } = await db
                     .from('halaqah')
                     .insert([data]);
                 if (error) throw error;
@@ -80,7 +80,7 @@ export default function HalaqahManagement() {
 
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await supabase.from('halaqah').delete().eq('id', id);
+            const { error } = await db.from('halaqah').delete().eq('id', id);
             if (error) throw error;
         },
         onSuccess: () => {

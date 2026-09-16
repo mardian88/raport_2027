@@ -16,7 +16,29 @@ const loginSchema = z.object({
     password: z.string().min(1, 'Password wajib diisi'),
 });
 
+// In-memory rate limiting (max 5 attempts per IP per minute)
+const rateLimits = new Map<string, { count: number; resetAt: number }>();
+const MAX_ATTEMPTS = 5;
+const WINDOW_MS = 60 * 1000;
+
 authRouter.post('/login', async (c) => {
+    // Basic IP tracking from headers, fallback to a dummy if missing
+    const ip = c.req.header('x-forwarded-for') || 'unknown-ip';
+    const now = Date.now();
+    
+    let limitData = rateLimits.get(ip);
+    if (!limitData || limitData.resetAt < now) {
+        limitData = { count: 0, resetAt: now + WINDOW_MS };
+    }
+    
+    if (limitData.count >= MAX_ATTEMPTS) {
+        return c.json({ error: 'Terlalu banyak percobaan login. Silakan coba lagi nanti.' }, 429);
+    }
+    
+    // Increment attempts temporarily
+    limitData.count += 1;
+    rateLimits.set(ip, limitData);
+
     const body = await c.req.json();
     const parsed = loginSchema.safeParse(body);
     if (!parsed.success) {
@@ -60,6 +82,9 @@ authRouter.post('/login', async (c) => {
         role: user.role,
         email: user.email,
     });
+
+    // Reset login attempts on success
+    rateLimits.delete(ip);
 
     setCookie(c, COOKIE_NAME, token, COOKIE_OPTIONS);
 

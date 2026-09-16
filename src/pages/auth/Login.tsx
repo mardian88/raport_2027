@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -26,7 +26,7 @@ export default function Login() {
             loginEmail = 'admin@rqm.com';
         }
 
-        const { error } = await supabase.auth.signInWithPassword({
+        const { error } = await db.auth.signInWithPassword({
             email: loginEmail,
             password,
         });

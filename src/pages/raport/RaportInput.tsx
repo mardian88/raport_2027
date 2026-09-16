@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { tursoClient as db } from '../../lib/turso-client';
 import type { Student, SettingsLembaga, ReportCard, Semester, TeacherAssignment } from '../../types';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -122,7 +122,7 @@ export default function RaportInput() {
     const { data: students } = useQuery({
         queryKey: ['students'],
         queryFn: async () => {
-            const { data } = await supabase
+            const { data } = await db
                 .from('students')
                 .select('*, halaqah_data:halaqah(*, shift)')
                 .eq('is_active', true)
@@ -135,7 +135,7 @@ export default function RaportInput() {
     const { data: globalTahsinItems } = useQuery({
         queryKey: ['tahsin_master_global'],
         queryFn: async () => {
-            const { data } = await supabase
+            const { data } = await db
                 .from('tahsin_master')
                 .select('nama_item')
                 .eq('is_active', true)
@@ -147,7 +147,7 @@ export default function RaportInput() {
     const { data: activeSemesterData } = useQuery({
         queryKey: ['active_semester'],
         queryFn: async () => {
-            const { data } = await supabase.from('semesters').select('*, academic_year:academic_years(*)').eq('is_active', true).single();
+            const { data } = await db.from('semesters').select('*, academic_year:academic_years(*)').eq('is_active', true).single();
             return data as Semester & { academic_year: any };
         }
     });
@@ -157,7 +157,7 @@ export default function RaportInput() {
         queryKey: ['teacher_assignments', session?.user?.id],
         enabled: !!session?.user?.id,
         queryFn: async () => {
-            const { data, error } = await supabase
+            const { data, error } = await db
                 .from('teacher_assignments')
                 .select(`
                     *,
@@ -174,7 +174,7 @@ export default function RaportInput() {
     const { data: allHalaqahs } = useQuery({
         queryKey: ['all_halaqahs_filter'],
         queryFn: async () => {
-            const { data } = await supabase.from('halaqah').select('*').eq('is_active', true).order('nama');
+            const { data } = await db.from('halaqah').select('*').eq('is_active', true).order('nama');
             return data as { id: string; nama: string }[];
         }
     });
@@ -201,7 +201,7 @@ export default function RaportInput() {
     const { data: settings } = useQuery({
         queryKey: ['settings'],
         queryFn: async () => {
-            const { data } = await supabase.from('settings_lembaga').select('*').single();
+            const { data } = await db.from('settings_lembaga').select('*').single();
             return data as SettingsLembaga;
         }
     });
@@ -211,7 +211,7 @@ export default function RaportInput() {
         queryKey: ['report_card', selectedStudentId, activeSemester?.id],
         enabled: !!selectedStudentId && !!activeSemester?.id,
         queryFn: async () => {
-            const { data } = await supabase
+            const { data } = await db
                 .from('report_cards')
                 .select('*')
                 .eq('student_id', selectedStudentId)
@@ -552,9 +552,9 @@ export default function RaportInput() {
             let reportId = existingReport?.id;
 
             if (reportId) {
-                await supabase.from('report_cards').update(payload).eq('id', reportId);
+                await db.from('report_cards').update(payload).eq('id', reportId);
             } else {
-                const { data, error } = await supabase.from('report_cards').insert([payload]).select().single();
+                const { data, error } = await db.from('report_cards').insert([payload]).select().single();
                 if (error) throw error;
                 reportId = data.id;
             }
@@ -563,13 +563,15 @@ export default function RaportInput() {
             if (reportId && Object.keys(tahfidzProgress).length > 0) {
                 const progressRecords = Object.entries(tahfidzProgress).map(([surahId, scores]) => ({
                     report_card_id: reportId,
+                    student_id: selectedStudentId,
+                    semester_id: activeSemester.id,
                     surah_id: surahId,
                     kb: scores.kb,
                     kh: scores.kh
                 }));
 
                 // Upsert progress
-                const { error: progressError } = await supabase
+                const { error: progressError } = await db
                     .from('tahfidz_progress')
                     .upsert(progressRecords, { onConflict: 'report_card_id,surah_id' });
 
